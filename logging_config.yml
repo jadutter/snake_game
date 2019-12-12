@@ -1,6 +1,6 @@
 version: 1
 disable_existing_loggers: False
-log_folder: G:/Home/Code/game_3/logs/
+log_folder: /Home/Code/game_3/logs/
 formatters:
     # https://docs.python.org/3/library/logging.html#logrecord-attributes
     basic:

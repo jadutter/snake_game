@@ -132,7 +132,8 @@ class Fruit(object):
         self._frequency = frequency
 
     def __str__(self):
-        return "Fruit<{}>".format(self.value)
+        # return "Fruit<{}>".format(self.value)
+        return f"Fruit({self.name},v={self.value},dim={self.dimensions})"
 
     def __repr__(self):
         return str(self)

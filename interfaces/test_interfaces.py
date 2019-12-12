@@ -95,7 +95,6 @@ class TestSnakeGameInitObject(unittest.TestCase):
         self.assertEqual(game.next_cmd, None)
 
         # self.assertEqual(game.game_state, None)
-        # game.set_game_state()
 
         self.assertNotEqual(game.game_state, None)
         self.assertEqual(len(game.game_state), 4)
@@ -150,9 +149,9 @@ def test_getting_game_state(self):
 data = {
     "height": 100,
     "width": 100,
-    "frames": 30,
+    "frames": 1,
     "score": 10,
-    "snake_speed": 5,
+    "snake_speed": 1,
     "size": 1,
     "starting_length": 3,
     "auto_tick": False,
@@ -175,12 +174,12 @@ class TestSnakeGameObject(unittest.TestCase):
     """
     def setUp(self):
         data = {
-            "height": 640,
-            "width": 640,
+            "height": 352,
+            "width": 352,
             "frames": 30,
             "score": 10,
             "snake_speed": 5,
-            "size": 10,
+            "size": 11,
             "starting_length": 2,
             "auto_tick": False,
             "fruits":{
@@ -199,14 +198,17 @@ class TestSnakeGameObject(unittest.TestCase):
         """
         Test SnakeGame object ability to generate a random point safely.
         """
-        for x in range(1):
-        # for x in range(1000):
+        # for x in range(1):
+        for x in range(1000):
             point = self.game.get_point()
+            # debug(f" {point} ")
             self.assertEqual(len(point), 2)
             self.assertTrue(0 < point[0])
             self.assertTrue(0 < point[1])
             self.assertTrue(point[0] < self.game.width)
             self.assertTrue(point[1] < self.game.height)
+            self.assertTrue(point[0]%self.game.size == 0)
+            self.assertTrue(point[1]%self.game.size == 0)
 
     def test_germ(self):
         """
@@ -259,15 +261,17 @@ class TestSnakeGameCmdProcesses(unittest.TestCase):
         old_heading = global_game.snake.heading
         new_heading = (old_heading+1)%4
         # have the snake turn to it's relative right (west)
+        self.assertNotEqual(old_heading, new_heading)
 
         self.assertEqual(global_game.snake.heading, old_heading)
         old_position = global_game.snake.segments
-        args = [ a for a in self.proc._args ]+[new_heading]
-        self.proc._args = tuple(args)
-        # set the new command
-        self.proc.start()
-        self.proc.join()
-        # execute the new command
+        # args = [ a for a in self.proc._args ]+[new_heading]
+        # self.proc._args = tuple(args)
+        # # set the new command
+        # self.proc.start()
+        # self.proc.join()
+        # # execute the new command
+        test_setting_next_cmd(global_game, new_heading)
         self.assertEqual(global_game.next_cmd, new_heading)
         # show that the game received the command and has it cached
         global_game.update()

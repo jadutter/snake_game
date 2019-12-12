@@ -121,28 +121,71 @@ def filter_sort(val,cond):
 #         del frame
 #         return result
 
-def trace_fnc_path(skip=0, base_fnc=None):
+def trace_call_path(skip=0, truncate=0, deep=None, shallow=None, delimiter=None):
     """
     When called, trace the series of functions that were called to get it.
-    skip is how many nearest levels it should not bother printing.
+    deep     = the name of the deepest function we'll want to exclude from using.
+                don't use functions below this one.
+    shallow  = the name of the shallowest function we'll want to exclude from using; 
+                don't use functions above this one.
+    skip     = how many deepest levels it should not bother using;
+                applied after deep and shallow keyword arguments, if they're used.
+    truncate = how many shallowest levels it should not bother using;
+                applied after deep and shallow keyword arguments, if they're used.
+    For sanity, it's recommended that you use (skip, truncate) or (deep,shallow).
+    Good luck if you try using all three at once
     """
-    try:
-        curframe = inspect.currentframe()
-        calframe = inspect.getouterframes(curframe, 2)
-        fnc_path = list(reversed([ item[3] for item in calframe if item[3]!=inspect.getframeinfo(curframe)[2] ]))
-        if(skip != 0 and skip < len(fnc_path) and base_fnc == None):
-            fnc_path = fnc_path[:-skip]
-        from __main__ import __file__ as main_file;
-        file_name = os.path.splitext(os.path.basename(main_file))[0]
-        fnc_path = map(lambda item: file_name if item=="<module>" else item, fnc_path)
-        fnc_path = ":".join(fnc_path)
-        if base_fnc != None and len(fnc_path)>0 and fnc_path.find(base_fnc) != -1:
-            fnc_path = fnc_path.split(base_fnc)[0].strip(":")
-        return fnc_path
-    except Exception as err:
-        logging.exception(err)
-        aux_warn("Failed to trace called functions", extra = { "err": err, "tb": sys.exc_info()[2] } )
-        return "Failed to trace called functions."
+    if delimiter is None:
+        delimiter = ":"
+    elif not isinstance(delimiter,str):
+        raise TypeError("Expected str for keyword argument delimiter, not {}".format(type(delimiter)))
+    elif len(delimiter) != 0:
+        raise ValueError("Expected a str containing a single character for keyword argument delimiter, not '{}'".format(delimiter))
+    if shallow is not None and not isinstance(shallow,str):
+        raise TypeError("Expected str for keyword argument shallow, not {}".format(type(shallow)))
+    if deep is not None and not isinstance(deep,str):
+        raise TypeError("Expected str for keyword argument deep, not {}".format(type(deep)))
+    if not isinstance(skip,int):
+        raise TypeError("Expected int for keyword argument skip, not {}".format(type(skip)))
+    if not isinstance(truncate,int):
+        raise TypeError("Expected int for keyword argument truncate, not {}".format(type(truncate)))
+    curframe = inspect.currentframe()
+    # the frame for trace_call_path 
+    calframes = inspect.getouterframes(curframe, 2)
+    # list of frames for what called the current frame
+    call_path = [ item[3] for item in calframes if item[3] != inspect.getframeinfo(curframe)[2] ]
+    call_path = list(reversed(call_path))
+    call_path = [ ( __file__.split(os.sep)[-1][:-3] if item == "<module>" else item) for item in call_path ]
+    # call_path is a list of names, where the first element is the name of the file, 
+    # and the rest are the names of the functions called
+    if shallow is not None or deep is not None:
+        # if we want to exlude by name
+        for idx,name in enumerate(call_path):
+            # search for the index of the name
+            if name == shallow:
+                shallow = idx
+            if name == deep:
+                deep = idx
+    if isinstance(shallow, int):
+        # if we've got an index
+        call_path = call_path[shallow+1:]
+    if isinstance(deep, int):
+        # if we've got an index
+        call_path = call_path[0:deep]
+    if skip > 0:
+        if len(call_path) > skip:
+            # if the list is longer than the number of elements we want to remove
+            call_path = call_path[0:-skip]
+        else:
+            call_path = []
+    if truncate > 0:
+        if len(call_path) > truncate:
+            # if the list is longer than the number of elements we want to remove
+            call_path = call_path[truncate:]
+        else:
+            call_path = []
+    return delimiter.join(call_path)
+
 
 def get_tb():
     """
@@ -401,11 +444,12 @@ class TraceContextFilter(logging.Filter):
     def filter(self, record):
         err = None
         try:
-            record.call_trace = trace_fnc_path(base_fnc=self.base_fnc)
+            record.call_trace = trace_call_path(deep=self.base_fnc)
             # trace the which function called which function,
             # and stop at __wrap_log_fnc
         except Exception as err:
-            logging.exception(err)
+            record.call_trace = "Failed to get call_trace"
+            # logging.exception(err)
         finally:
             # return whether the record should be exported
             return err == None
@@ -443,7 +487,16 @@ def get_path(path):
     """
     Convert a full path
     """
-    return os.path.realpath(os.path.normpath(os.path.expanduser(path)))
+    # print("Received {}".format(path))
+    path = os.path.expandvars(path)
+    # print("{}".format(path))
+    path = os.path.expanduser(path)
+    # print("{}".format(path))
+    path = os.path.normpath(path)
+    # print("{}".format(path))
+    path = os.path.realpath(path)
+    # print("{}".format(path))
+    return path
 
 def dir_path(d):
     """

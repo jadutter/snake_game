@@ -113,6 +113,12 @@ class Obstacle(object):
         it's one virtual pixel occupies)
         """
         return self.dimensions[self._size]
+    def __str__(self):
+        # return "Obstacle<{}>".format(self.dimensions)
+        return f"Obstacle({self.dimensions})"
+
+    def __repr__(self):
+        return str(self)
 
 
 

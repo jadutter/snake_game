@@ -4,6 +4,29 @@ with contextlib.redirect_stdout(None):
     from pygame import Rect
     # from pygame.draw import rect as draw_rect
 del contextlib
+import logging
+
+try:
+    if "logr" not in globals():
+        logr = logging.getLogger("MainApp")
+        # get a logger
+        log = logr.log
+        crit = logr.critical
+        error = logr.error
+        warn = logr.warning
+        info = logr.info
+        debug = logr.debug
+        # take the logger methods that record messages and 
+        # convert them into simple one word functions
+        assert debug == getattr(logr,"debug"), "Something went wrong with getting logging functions..."
+        # the logger method called "debug", should now be the same as our function debug()
+except Exception as err:
+    logging.critical("Failed to configure logging for game.py")
+    logging.exception(err)
+    # print the message to the root logger
+    raise err
+finally:
+    pass
 
 class Segment(object):
     """
@@ -43,6 +66,7 @@ class Segment(object):
         """
         Return the longest dimension of the segment.
         """
+        # return max(self.h, self.w)
         if self.heading%2 == 0:
             # if pointed north/south
             return self.h
@@ -64,10 +88,7 @@ class Segment(object):
         """
         Setter for the x,y,w,h values
         """
-        if len(value) == 3:
-            self._dimensions = [value[0], value[1], max(value[2], 0), max(value[2], 0)]
-        else:
-            self._dimensions = [value[0], value[1], max(value[2], 0), max(value[3], 0)]
+        self._dimensions = [value[0], value[1], max(value[2], 0), max(value[3], 0)]
         # set _dimensions so that x,y,w,h getters work;
         # height and width cannot be negative
         if self.w == max(self.w,self.h):
@@ -142,7 +163,8 @@ class Segment(object):
         """
         How many pixels this segment occupies
         """
-        return self.dimensions[self._size]
+        # return self.dimensions[self._size]
+        return min(self.dimensions[2],self.dimensions[3])
 
     @property
     def origin(self):

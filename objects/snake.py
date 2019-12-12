@@ -8,7 +8,29 @@ del contextlib
 from .fruit import Fruit
 from .obstacle import Obstacle
 from .segment import Segment
+import logging
 
+try:
+    if "logr" not in globals():
+        logr = logging.getLogger("MainApp")
+        # get a logger
+        log = logr.log
+        crit = logr.critical
+        error = logr.error
+        warn = logr.warning
+        info = logr.info
+        debug = logr.debug
+        # take the logger methods that record messages and 
+        # convert them into simple one word functions
+        assert debug == getattr(logr,"debug"), "Something went wrong with getting logging functions..."
+        # the logger method called "debug", should now be the same as our function debug()
+except Exception as err:
+    logging.critical("Failed to configure logging for game.py")
+    logging.exception(err)
+    # print the message to the root logger
+    raise err
+finally:
+    pass
 class Snake(object):
     """
     The object a human or computer controls as they move about the game space.
@@ -39,7 +61,7 @@ class Snake(object):
         Draw a series of rectangles on a Surface.
         """
         def get_green(i):
-            val = 10
+            val = 30
             # the color should never go below 10 green
             val = max(val, 255-255*(i))
             # the color should start bright green, and decrease 
@@ -76,7 +98,10 @@ class Snake(object):
         """
         The sum of the lengths of all the Snake's segments.
         """
-        return sum([ seg.length for seg in self.segments ])
+        result = 0
+        for seg in self.segments:
+            result += seg.length 
+        return result
 
     @property
     def head(self):
@@ -250,7 +275,9 @@ class Snake(object):
                 else:
                     segment_b = [segment_b]
                 result = True
-                if len(segment_a) == 1:
+                if len(segment_a) == 0 or len(segment_b) == 0:
+                    result = False
+                elif len(segment_a) == 1:
                     seg_a, seg_a_heading = Snake._extract(segment_a[0])
                     for sb in segment_b:
                         seg_b, seg_b_heading = Snake._extract(sb)
@@ -283,6 +310,7 @@ class Snake(object):
                 # debug("checking segment {}".format(idx))
                 seg, seg_heading = Snake._extract(seg)
                 if Snake._compare_segments(head_heading, head, seg_heading, seg):
+                    # debug("Snake intersects itself {idx}")
                     # debug("{} {} {} {}".format(head_heading, head, seg_heading, seg))
                     return True
         except Exception as err:
@@ -306,6 +334,7 @@ class Snake(object):
         """
         The snake has died, and it's segments are now an empty list.
         """
+        # debug("DIE")
         self.segments = []
 
     def move(self,direction):
@@ -319,6 +348,8 @@ class Snake(object):
             """
             if self.belly <= 0:
                 # if no food in the belly
+                # debug(f"DECREMENT TAIL {self.length} {self.segments}")
+                # debug(f"{[seg.length for seg in self.segments ]}")
                 self.tail.decrement()
                 # decrease the tail
             else:
@@ -336,7 +367,7 @@ class Snake(object):
             decrement()
         elif((direction+2)%4 == self.heading):
             # if we're moving in the direct opposite way of the original heading
-            # debug("wrong direction")
+            # debug("SUICIDE")
             decrement()
             self.die()
             # die because the head turned 180 degrees and ran into the body
@@ -379,11 +410,14 @@ class Snake(object):
             else:
                 raise ValueError("Direction should be a number between 0-3, not {}".format(direction))
             self.heading = direction
-            self.segments = [Segment([origin[0], origin[1], self.size], self.heading)]+self.segments
+            # debug(self.segments)
+            self.segments = [Segment([origin[0], origin[1], self.size, self.size], self.heading)]+self.segments
+            # debug(self.segments)
             # create a new segment to be the new head
             decrement()
         if self.is_alive and self.self_intersects:
             # determine if the snake currently is self intersecting
+            debug("snake self_intersects")
             self.die()
 
     def interact(self,other):
@@ -391,10 +425,14 @@ class Snake(object):
         Determine what happens when the Snake interacts with certain object.
         """
         if isinstance(other, Obstacle):
+            # debug(f"Snake found {other}")
             self.die()
         elif isinstance(other, Segment):
+            # debug(f"Snake found {other}")
             self.die()
         elif isinstance(other, Snake):
+            # debug(f"Snake found {other}")
             self.die()
         elif isinstance(other, Fruit):
+            # debug(f"Snake found {other}")
             self.eat(other)
