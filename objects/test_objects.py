@@ -13,6 +13,7 @@ class TestFruitObject(unittest.TestCase):
     """
     Test that the Fruit object behaves as expected.
     """
+    # @unittest.skip("skipping test_init")
     def test_init(self):
         """
         Test if we can create a fruit object.
@@ -42,6 +43,7 @@ class TestSegmentObject(unittest.TestCase):
     """
     Test that the Segment object behaves as expected.
     """
+    # @unittest.skip("skipping test_init")
     def test_init(self):
         """
         Test if we can create a Segment object.
@@ -64,6 +66,7 @@ class TestObstacleObject(unittest.TestCase):
     """
     Test that the Obstacle object behaves as expected.
     """
+    # @unittest.skip("skipping test_init")
     def test_init(self):
         """
         Test if we can create a Obstacle object.
@@ -99,6 +102,7 @@ class TestSnakeObject(unittest.TestCase):
     """
     Test that the Snake object behaves as expected.
     """
+    # @unittest.skip("skipping test_init")
     def test_init(self):
         """
         Test if we can create a Snake object.
@@ -117,6 +121,7 @@ class TestSnakeObject(unittest.TestCase):
         snake_drawn = ouroboros.render()
         self.assertIsInstance( snake_drawn, list)
         self.assertIsInstance( snake_drawn[0], Rect)
+    # @unittest.skip("skipping test_self_intersection")
     def test_self_intersection(self):
         position = [0, 48]
         size = 8
@@ -142,6 +147,7 @@ class TestSnakeMethods(unittest.TestCase):
         heading = 0
         # pointed North
         self.snake = Snake(dimensions, heading)
+    # @unittest.skip("skipping test_move_north")
     def test_move_north(self):
         """
         Test if we can move north
@@ -151,6 +157,7 @@ class TestSnakeMethods(unittest.TestCase):
         self.assertEqual(len(self.snake.segments), 1)
         self.assertEqual(self.snake.length, self.snake.head.length)
 
+    # @unittest.skip("skipping test_move_east")
     def test_move_east(self):
         """
         Test if we can move east
@@ -161,6 +168,7 @@ class TestSnakeMethods(unittest.TestCase):
         self.assertEqual(self.snake.size, self.snake.head.length)
         self.assertEqual(self.snake.length-self.snake.size, self.snake.tail.length)
 
+    # @unittest.skip("skipping test_move_south")
     def test_move_south(self):
         """
         Test if we can move south
@@ -169,6 +177,7 @@ class TestSnakeMethods(unittest.TestCase):
         self.snake.move(2)
         self.assertEqual(len(self.snake.segments), 0)
 
+    # @unittest.skip("skipping test_move_west")
     def test_move_west(self):
         """
         Test if we can move west
@@ -179,6 +188,7 @@ class TestSnakeMethods(unittest.TestCase):
         self.assertEqual(self.snake.size, self.snake.head.length)
         self.assertEqual(self.snake.length-self.snake.size, self.snake.tail.length)
 
+    # @unittest.skip("skipping test_move_and_eat")
     def test_move_and_eat(self):
         """
         Test if we can move west,
@@ -222,6 +232,7 @@ class TestSnakeMethods(unittest.TestCase):
         self.assertEqual(len(self.snake.segments), 0)
         self.assertEqual(self.snake.belly, 5)
 
+    # @unittest.skip("skipping test_move_into_wall")
     def test_move_into_wall(self):
         """
         Test if we can move west,
@@ -250,6 +261,7 @@ class TestSnakeMethods(unittest.TestCase):
         self.assertFalse(self.snake.is_alive)
         self.assertEqual(len(self.snake.segments), 0)
 
+    # @unittest.skip("skipping test_move_into_snake")
     def test_move_into_snake(self):
         """
         Test if we can move west,

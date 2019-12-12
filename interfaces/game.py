@@ -9,6 +9,8 @@ from objects.obstacle import Obstacle
 from objects.fruit import Fruit
 import multiprocessing
 import logging
+import copy
+from collections import OrderedDict
 
 try:
     if "logr" not in globals():
@@ -65,6 +67,7 @@ class SnakeGame(object):
         # Whether to wait for a move, or automatically progress the game clock
         "reward_limit": 5,
         # limit how many fruit can be simultaneously created
+        "testing": False,
     }
     __valid_keys = {
             "0": 0,
@@ -256,44 +259,8 @@ class SnakeGame(object):
         """
         Check the output pipe for new information.
         """
-        result = None
+        result = []
         try:
-            # debug(f"getting game_state")
-            if self.owns_instance:
-                # if the calling Process owns this instantiated object
-                result = self.set_game_state()
-                # set the latest state of the game
-
-                # result = self.__game_state
-                # # used the last cached state
-            else:
-                if self.__state_parent.poll():
-                    # if there's new data waiting to be received
-                    result = self.__state_parent.recv()
-                    # use the new data
-                else:
-                    result = self.__game_state
-                    # used the last cached state
-        except Exception as err:
-            logging.exception(err)
-            logging.critical("Failed to get game_state")
-        finally:
-            return result
-    
-    @game_state.setter
-    def game_state(self, value):
-        # debug(f"setting game_state")
-        raise RuntimeError("Use set_game_state() instead of trying to directly set the game_state property")
-
-    def set_game_state(self):
-        """
-        Collate the state of the game and send it on the output pipe.
-        """
-        result = None
-        try:
-            if not self.owns_instance:
-                warn("Only the process that owns this object should be setting the state of the game")
-                # do it anyway, rather than cause problems...
             result = [
                     # the game
                     [
@@ -333,6 +300,8 @@ class SnakeGame(object):
                         ],
                         self.snake.belly,
                         # how many points are in the snakes belly
+                        self.snake.length,
+                        # how long overall the snake is
                     ],
                 ]
             # raise IOError("Output pipe is closed")
@@ -341,9 +310,112 @@ class SnakeGame(object):
             logging.critical("Failed to execute set_game_state")
         finally:
             # debug(f"set_game_state returning {result}")
-            if result is not None:
-                self.__game_state = result
-            return self.__game_state
+            # if result is not None and result is not []:
+            #     self.__game_state = result
+            return result
+
+    @staticmethod
+    def label_state(state):
+        def labels_fmt(state,labels):
+            d = OrderedDict()
+            if state is None:
+                return None
+            for idx,l in enumerate(labels):
+                if isinstance(l,str):
+                    d[l] = state[idx]
+                elif isinstance(l,tuple) and len(l) == 2 and isinstance(l[1],list):
+                    name, lbs = l
+                    temp = []
+                    for item in state[idx]:
+                        if all([isinstance(i,str) for i in lbs]):
+                            temp += [OrderedDict([a for a in zip(lbs, item)])]
+                        else:
+                            temp += [labels_fmt(item, tuple(lbs))]
+                    d[name] = temp
+                elif isinstance(l,tuple) and len(l) == 2 and isinstance(l[1],tuple):
+                    name, lbs = l
+                    d[name] = labels_fmt(state[idx],lbs)
+                elif callable(l):
+                    return l(*state)
+                else:
+                    for i,name in enumerate(l):
+                        if isinstance(state[idx],(tuple,list)) :
+                            if len(state[idx]) < i+1:
+                                d[name] = None
+                            else:
+                                d[name] = state[idx][i]
+                        else:
+                            d[name] = state[idx]
+            return d
+        obstacle_str = lambda x,y,w,h: f"Obstacle< x:{x: >5}, y:{y: >5}, w:{w: >5}, h:{h: >5}>"
+        fruit_str = lambda dm,vl: f"Fruit< x:{dm[0]: >5}, y:{dm[1]: >5}, w:{dm[2]: >5}, h:{dm[2]: >5}, value:{vl}>"
+        # segment_str = lambda dm,hd: f"Segment< x:{dm[0]: >5}, y:{dm[1]: >5}, w:{dm[2]: >5}, h:{dm[3]: >5}, heading:{hd}>"
+        segment_str = lambda dm,hd: f"Segment< {dm} {hd} >"
+        labels = (
+                ("meta",("playing", "crashed", "score", "size", "height", "width", "snake_speed", "auto_tick")),
+                ("obstacles", [
+                                obstacle_str
+                                # "x", "y", "w", "h"
+                            ]),
+                ("rewards", [
+                                fruit_str
+                                # ("x", "y", "s"),"v"
+                            ]),
+                ("snake", (
+                        ("segments",[
+                            # ("x", "y", "w", "h"),"heading"
+                            segment_str
+                        ]),
+                        "belly",
+                        "length",
+                        )
+                )
+            )
+        result = labels_fmt(state, labels)
+        return result
+
+    @staticmethod
+    def compare_states(list_a, list_b):
+        result = True
+        try:
+            if isinstance(list_b,list) and isinstance(list_a,list):
+                if len(list_a) == len(list_b):
+                    for idx,item in enumerate(list_b):
+                        if result is False:
+                            break
+                        if isinstance(item,list) and len(list_a) < idx+1:
+                            result = False 
+                            break
+                        if isinstance(item,list) and len(list_a) >= idx+1:
+                            result = SnakeGame.compare_states(list_a[idx], list_b[idx])
+                        else:
+                            result = (list_a[idx] == list_b[idx])
+                else:
+                    result = False
+            elif type(list_a) == type(list_b):
+                if isinstance(list_a, (Segment,Obstacle)):
+                    props = ["x","y","w","h","heading"]
+                elif isinstance(list_a, Fruit):
+                    props = ["x","y","w","h","value"]
+                elif isinstance(list_a, Snake):
+                    props = ["x","y","w","h"]
+                    result = compare_states(list_a.segments, list_b.segments)
+                    result = compare_states(list_a.belly, list_b.belly) and result
+                    result = compare_states(list_a.heading, list_b.heading) and result
+                    return result
+                else:
+                    props = list_a.__dict__.keys()
+                for k in props:
+                    if not hasattr(list_b,k) or list_b.__dict__[k] != list_a.__dict__[k]:
+                        result = False 
+                        break
+            else:
+                result = (list_a == list_b)
+        except Exception as err:
+            result = False
+            error(f"Game.compare_states error: {err}")
+        finally:
+            return result
     
     def _test_next_cmd_setter(self,value):
         """
@@ -468,11 +540,11 @@ class SnakeGame(object):
                 # debug(f"Next fruit spawned {self.next_fruit}")
                 self.next_fruit = None
                 return fruit
-    def _get_snake(self):
+    def _get_snake(self, depth=0):
         """
         Use the current attributes of the game to create a new snake object.
         """
-        debug("Game._get_snake")
+        # debug("Game._get_snake")
 
         heading = self.rand.randint(0,3)
         # choose an integer between 0 and 3 to represent a cardinal direction
@@ -482,7 +554,16 @@ class SnakeGame(object):
                 snake = Snake([position[0], position[1], self.size, self.starting_length*self.size], heading)
             except Exception as err:
                 snake = Snake([position[0], position[1], self.size, self.starting_length*self.size], (heading+1)%4)
-            return snake
+            # safe_distance = int(round(min(self.width, self.height)/10))
+            safe_distance = 5
+            if self._peek(snake, snake.heading, safe_distance):
+                return snake
+            else:
+                if depth >= 30:
+                    error("Went too deep trying to get a safe spawn for snake")
+                    return None
+                else:
+                    return self._get_snake(depth=depth+1)
             # return a snake object that's within the game boundaries
         else:
             raise ValueError("Failed to pick a random point to spawn the snake")
@@ -570,14 +651,19 @@ class SnakeGame(object):
             else:
                 pass
                 # leave the snake alone
-            if move is not None and self._loop_counter >= self.frames/self.snake_speed:
+            limit = int(self.frames/self.snake_speed)
+            if move is not None and (self._loop_counter >= limit or limit == 1):
                 # if we're allowed to move during this cycle
-                debug(f"MOVING SNAKE TO {cmd} - {move}")
+                # debug(f"MOVING SNAKE TO {cmd} - {move}")
                 self.snake.move(move)
                 self._loop_counter = -1
                 self.get_fruit()
                 self.next_cmd = None
                 # remove the cached command now that we've used it
+            # else:
+            #     debug(f"no move because {move} is not None and {self._loop_counter} >= {self.frames}/{self.snake_speed}")
+            #     debug(f"no move because {move} is not None and {self._loop_counter} >= {int(self.frames/self.snake_speed)}")
+            #     debug(f"no move because {move is not None} and {self._loop_counter >= int(self.frames/self.snake_speed)}")
             for wall in self.obstacles:
                 if self.snake.is_alive:
                     if self.snake.intersects(self.snake.head,wall):
@@ -621,6 +707,37 @@ class SnakeGame(object):
         Change the game to a paused state.
         """ 
         self.playing = False
+
+    def _peek(self, snake, direction, distance):
+        """
+        Check whether moving the snake in "direction" by "distance" units,
+        would result in it intersecting an object.
+        """
+        survived = True
+        try:
+            astral_snake = copy.deepcopy(snake)
+            while distance > 0:
+                astral_snake.move(direction)
+                for wall in self.obstacles:
+                    if astral_snake.is_alive:
+                        if astral_snake.intersects(astral_snake.head,wall):
+                            debug(f"Astral Snake hit {wall}")
+                            astral_snake.interact(wall)
+                if astral_snake.is_alive:
+                    for fruit in self.rewards:
+                        if astral_snake.intersects(astral_snake.head,fruit):
+                            debug(f"Astral Snake hit {fruit}")
+                            astral_snake.interact(fruit)
+                if not astral_snake.is_alive:
+                    survived = False
+                    break
+                distance -= 1
+        except Exception as err:
+            survived = False
+            error(f"Game.peek error: {err}")
+        finally:
+            return survived
+
 
     def __getstate__(self):
         # capture what is normally pickled

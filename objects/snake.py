@@ -337,38 +337,44 @@ class Snake(object):
         # debug("DIE")
         self.segments = []
 
-    def move(self,direction):
+    def _decrement_whole(self):
+        """
+        We've moved, and need to subtract for the tail or belly.
+        """
+        if self.belly <= 0:
+            # if no food in the belly
+            # debug(f"DECREMENT TAIL {self.length} {self.segments}")
+            # debug(f"{[seg.length for seg in self.segments ]}")
+            # debug(f"DECREMENT TAIL {self.tail}")
+            self.tail.decrement()
+            # debug(f"DECREMENT TAIL {self.tail}")
+            # decrease the tail
+        else:
+            # still have food in the belly, decrement it instead
+            self.belly = self.belly - 1
+        if self.tail.length <= 0:
+            # if the tail segment no longer has a length, 
+            self.segments.remove(self.tail)
+            # remove the Segment from the list of segments that the snake is using
+
+    def move(self, direction):
         """
         Move the snake, interact with objects, 
         grow the head, and shrink the tail (if necessary).
         """
-        def decrement():
-            """
-            We've moved, and need to subtract for the tail or belly.
-            """
-            if self.belly <= 0:
-                # if no food in the belly
-                # debug(f"DECREMENT TAIL {self.length} {self.segments}")
-                # debug(f"{[seg.length for seg in self.segments ]}")
-                self.tail.decrement()
-                # decrease the tail
-            else:
-                # still have food in the belly, decrement it instead
-                self.belly = self.belly - 1
-            if self.tail.length <= 0:
-                # if the tail segment no longer has a length, 
-                self.segments.remove(self.tail)
-                # remove the Segment from the list of segments that the snake is using
+        # debug(f"Moving segments {self.segments}")
+        if len(self.segments) <= 0:
+            raise RuntimeError("Snake has no body parts to move!")
         if direction == self.heading:
             # still moving in the same heading?
             # debug("same direction")
             self.head.increment()
             # increase the head
-            decrement()
+            self._decrement_whole()
         elif((direction+2)%4 == self.heading):
             # if we're moving in the direct opposite way of the original heading
             # debug("SUICIDE")
-            decrement()
+            self._decrement_whole()
             self.die()
             # die because the head turned 180 degrees and ran into the body
         else:
@@ -414,11 +420,13 @@ class Snake(object):
             self.segments = [Segment([origin[0], origin[1], self.size, self.size], self.heading)]+self.segments
             # debug(self.segments)
             # create a new segment to be the new head
-            decrement()
+            self._decrement_whole()
         if self.is_alive and self.self_intersects:
             # determine if the snake currently is self intersecting
             debug("snake self_intersects")
             self.die()
+
+        # debug(f"Moved segments {self.segments}")
 
     def interact(self,other):
         """

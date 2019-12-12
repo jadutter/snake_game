@@ -89,6 +89,9 @@ def run_tests(*args,**kwargs):
     # test_locking()
     test_modules = ["objects", "interfaces", "gui", "parsing"]
     # test_modules = ["gui"]
+    # test_modules = ["interfaces"]
+    # test_modules = ["objects"]
+    # test_modules = ["gui","interfaces"]
     suites = []
     loader = unittest.TestLoader()
     for mod_name in test_modules:
@@ -109,15 +112,19 @@ def human_game(*args,**kwargs):
     Start a game of Snake for a human to play.
     """
     data = {
-        "height": 80,
-        "width": 80,
+        "height": 320,
+        "width": 320,
         "size": 10,
         "snake_speed": 10,
         "auto_tick": True,
         "frames": 60,
+        "testing": False,
     }
     game = SnakeGame(**data)
-    board = Gameboard(game)
+    data = {
+        "screenshot_path": None,
+    }
+    board = Gameboard(game, **data)
     board.start()
     debug("Finished starting")
     return 
@@ -142,10 +149,11 @@ if __name__ == '__main__':
 
 
 # *** TODO LIST ***
-# Write DQN to read current state and send commands
-# Setup game to be able to log state to a database
+# fix the frequency at which fruit spawn
 # Setup game board to be able to render and play slices of a recorded game state
-# Change game to not spawn snake close to and pointed at a wall
+# Setup game to be able to log state to a database
+# create a method(s) so that a series of states can be given, and the game will save the screenshots
+# Write DQN to read current state and send commands
 # Setup menu to be able to change settings:
 #     size
 #     speed
@@ -155,22 +163,10 @@ if __name__ == '__main__':
 # determine what will set the score, and how it is tracked overtime
 # set exe icon
 # create win condition and winning screen
-# fix intersection detection when Snake has no segments
 # set restart to start the game again from the beginning instead of resuming the current game
-# fix the frequency at which fruit spawn
 # create easy, meduim, hard default settings
-# set font sizes to be dependent on screen sizes
-# fix error logging 
-# """2019-12-11 16:13:52,805 - root         - ERROR    - cannot import name '__file__' from '__main__' (unknown location)
-# Traceback (most recent call last):
-#   File "G:\Home\Code\game_3\auxillary.py", line 135, in trace_fnc_path
-#     from __main__ import __file__ as main_file;
-# ImportError: cannot import name '__file__' from '__main__' (unknown location)
-# 2019-12-11 16:13:52,820 - root         - ERROR    - cannot import name '__file__' from '__main__' (unknown location)
-# Traceback (most recent call last):
-#   File "G:\Home\Code\game_3\auxillary.py", line 135, in trace_fnc_path
-#     from __main__ import __file__ as main_file;
-# ImportError: cannot import name '__file__' from '__main__' (unknown location)"""
+# setup game to convert images into video (timestamped) on game over
+
 
 # *** RESEARCH TOPICS ***
 # # hamiltonian loops

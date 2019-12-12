@@ -2,10 +2,14 @@ import contextlib
 with contextlib.redirect_stdout(None):
     import pygame as pg
 del contextlib
-
+# from auxillary import trace_call_path
 import logging
 import time
 import re
+import os
+import copy
+import json
+from interfaces.game import SnakeGame
 
 try:
     if "logr" not in globals():
@@ -44,7 +48,7 @@ class Gameboard(object):
                 "family": "./resources/Roboto-Regular.ttf",
                 "size": 32
             },
-        }
+        },
     }
     valid_keys = {
         "north":{
@@ -109,6 +113,16 @@ class Gameboard(object):
         self.valid_codes = [ code for name,key_cfg in self.valid_keys.items() for code in key_cfg.get("codes") ]
         self.latest_state = None
         self.screenshot_counter = 0
+        if isinstance(self.screenshot_path,str):
+            self.screenshot_path = os.path.realpath(os.path.normpath(os.path.expanduser(os.path.expandvars(self.screenshot_path))))
+
+    @property
+    def testing(self):
+        return self.game.testing
+    
+    @testing.setter
+    def testing(self, value):
+        self.game.testing = value
 
     def _simplify_pattern(self, sequence):
         """
@@ -365,8 +379,8 @@ class Gameboard(object):
             pg.display.init()
             pg.font.init()
         while self.game.snake.is_alive and self.game.crashed is False:
-            debug(f"self.game.game_state {self.game.game_state}")
-            if self.screenshot_path is not None and self.game.game_state is not None:
+            # debug(f"self.game.game_state {self.game.game_state}")
+            if isinstance(self.screenshot_path,str) and self.game.game_state is not None:
                 self.screenshot()
             self.handle_keys()
             self.game.update()
@@ -389,42 +403,51 @@ class Gameboard(object):
                 break
 
     def screenshot(self):
-        def compare_lists(list_a, list_b):
-            result = True
-            try:
-                if isinstance(list_b,list) and isinstance(list_a,list):
-                    for idx,item in enumerate(list_b):
-                        if isinstance(item,list):
-                            result = compare_lists(list_a[idx], list_b[idx])
-                        else:
-                            result = (list_a[idx] == list_b[idx])
-                        if result is False:
-                            break
-                else:
-                    result = (list_a == list_b)
-            except Exception as err:
-                result = False
-                error(f"Gameboard.screenshot.compare_lists error: {err}")
-            finally:
-                return result
+        # def compare_lists(list_a, list_b):
+        #     result = True
+        #     try:
+        #         if isinstance(list_b,list) and isinstance(list_a,list):
+        #             for idx,item in enumerate(list_b):
+        #                 if isinstance(item,list):
+        #                     result = compare_lists(list_a[idx], list_b[idx])
+        #                 else:
+        #                     result = (list_a[idx] == list_b[idx])
+        #                 if result is False:
+        #                     break
+        #         else:
+        #             result = (list_a == list_b)
+        #     except Exception as err:
+        #         result = False
+        #         error(f"Gameboard.screenshot.compare_lists error: {err}")
+        #     finally:
+        #         return result
         # if self.latest_state != self.game.game_state:
         #     # if the state we last took a screenshot does not match the current state of the game
         #     self.latest_state = self.game.game_state
 
-        current_state = [item for item in self.game.game_state]
+        current_state = copy.deepcopy(self.game.game_state)
         # create a copy of the current game state
-        if compare_lists(self.latest_state, current_state):
-            # if the state of the last screenshot taken does not
-            # match the current state of the game
-            filename = f"screenshot-{self.screenshot_counter:0>7}.png"
-            filename = os.path.join(self.screenshot_path,filename)
-            debug(f"Saving {filename}")
-            pg.image.save(self.app_surface, filename)
-            # save a screenshot of the current game
-            self.latest_state = current_state
-            # hold onto the latest state of the game
-        else:
-            debug(f"Can't save screenshot because no change detected")
+        filename = f"screenshot-{self.screenshot_counter:0>7}.png"
+        filename = os.path.join(self.screenshot_path,filename)
+        if self.testing is False:
+            debug(f"Next screenshot {filename}")
+        pretty_state = lambda st: json.dumps(SnakeGame.label_state(st),indent=4,separators=(",",": "))
+        if self.game.playing:
+            if not SnakeGame.compare_states(self.latest_state, current_state):
+                # if the state of the last screenshot taken does not
+                # match the current state of the game
+                debug(f"Saving {filename}")
+                pg.image.save(self.app_surface, filename)
+                # save a screenshot of the current game
+                self.latest_state = copy.deepcopy(current_state)
+                # hold onto the latest state of the game
+                self.screenshot_counter += 1
+            else:
+                # if self.testing is False:
+                #     debug(f"self.latest_state {pretty_state(self.latest_state)}")
+                #     debug(f"current_state {pretty_state(current_state)}")
+                #     debug(f"Can't save screenshot because no change detected")
+                self.latest_state = copy.deepcopy(current_state)
 
 
     def update(self,frames=None):

@@ -250,6 +250,7 @@ class Segment(object):
             # keep top left corner & decr width
 
     def __str__(self):
+        # return "Seg<{},{},{},{}|{}|{}|{}>".format(self.x,self.y,self.w,self.h,self.dimensions,self.heading,self.length)
         return "Seg<{},{},{},{}>".format(self.x,self.y,self.w,self.h)
 
     def __repr__(self):
@@ -258,3 +259,4 @@ class Segment(object):
             if (k.find("__") != 0):
                 d[k] = getattr(self,k)
         return "Seg({})".format(", ".join(["{} = {}".format(k,v) for k,v in d.items()]))
+        # return str(self)

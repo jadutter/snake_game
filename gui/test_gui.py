@@ -12,6 +12,7 @@ from objects.obstacle import Obstacle
 from objects.fruit import Fruit
 import logging
 import time
+import os
 
 try:
     if "logr" not in globals():
@@ -62,6 +63,7 @@ class TestGuiObjectKeySequencing(unittest.TestCase):
         data = {
             # "height": 352,
             # "width": 352,
+            "testing": True,
             "height": 640,
             "width": 640,
             # "frames": 60,
@@ -260,6 +262,30 @@ class TestGuiObjectKeySequencing(unittest.TestCase):
         self.assertEqual(self.game.playing, True)
         self.quitGame()
         debug("finished test_restart")
+    # @unittest.skip("skipping test_screenshots")
+    def test_screenshots(self):
+        """
+        Test the ability to restart the game
+        """
+        # interfaces.TestSnakeGameCmdProcesses.test_state_change
+        debug("start test_screenshots")
+        self.board.start()
+        time.sleep(1)
+        if not self.game.playing:
+            self.board.simulate_keys("rv, r^", action="set")
+        time.sleep(1)
+        self.assertEqual(self.game.playing, True)
+        if self.game.playing:
+            self.board.simulate_keys("RIGHTv, RIGHT^, DOWNv, DOWN^, LEFTv, LEFT^, SPACEv, SPACE^", action="set")
+            time.sleep(2)
+        self.assertEqual(self.game.playing, False)
+        screenshots = os.listdir(self.board.screenshot_path)
+        self.assertTrue(len(screenshots) > 0)
+
+
+
+        self.quitGame()
+        debug("finished test_screenshots")
 
 
 # class TestGuiKeySeqWithInit(unittest.TestCase):
@@ -268,6 +294,7 @@ class TestGuiObjectKeySequencing(unittest.TestCase):
 #     """
 #     def setUp(self):
 #         data = {
+#             "testing": True,
 #             "height": 640,
 #             "width": 640,
 #             "size": 10,

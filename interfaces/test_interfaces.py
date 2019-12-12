@@ -1,5 +1,6 @@
 import unittest
 import multiprocessing
+import json
 from .player import Player
 from .game import *
 from .DQN import DQN
@@ -41,103 +42,105 @@ except Exception as err:
 finally:
     pass
 
-class TestSnakeGameInitObject(unittest.TestCase):
-    """
-    Test that the SnakeGame object behaves as expected.
-    """
-    def test_init(self):
-        """
-        Test if we can create a SnakeGame object.
-        """
-        data = {
-            "height": 640,
-            "width": 640,
-            "frames": 30,
-            "score": 10,
-            "snake_speed": 5,
-            "size": 10,
-            "starting_length": 2,
-            "auto_tick": False,
-            "fruits":{
-                "apple": lambda dimensions: Fruit("apple", dimensions, 1, color=(200,0,0), frequency=0.05 ),
-                # 1 in 20 chance of an apple appearing each second, worth 1 point
-                "orange": lambda dimensions: Fruit("orange", dimensions, 10, color=(128,128,0), frequency=0.01 ),
-                # 1 in 100 chance of an orange appearing each second, worth 10 points
-                "bananna": lambda dimensions: Fruit("bananna", dimensions, 20, color=(255,255,0), frequency=0.005 ),
-                # 1 in 200 chance of an bananna appearing each second, worth 20 points
-            }
-        }
-        game = SnakeGame(**data)
-        self.assertFalse(game.auto_tick)
-        self.assertEqual(game.height, data.get("height"))
-        self.assertEqual(game.width, data.get("width"))
-        self.assertEqual(game.frames, data.get("frames"))
-        self.assertEqual(game.score, data.get("score"))
-        self.assertEqual(game.snake_speed, data.get("snake_speed"))
-        self.assertEqual(game.size, data.get("size"))
-        self.assertEqual(game.starting_length, data.get("starting_length"))
-        self.assertEqual(game.crashed, False)
-        self.assertEqual(game.playing, False)
-        self.assertEqual(game.next_fruit, None)
-        # self.assertEqual(game.obstacles, [])
-        self.assertEqual(len(game.obstacles), 4)
-        self.assertEqual(game.rewards, [])
-        apple = game.fruits.get("apple")([ 45, 67, game.size])
-        self.assertIsInstance(apple, Fruit)
-        self.assertEqual(apple.frequency, 0.05)
-        self.assertEqual(apple.color, (200,0,0))
-        self.assertEqual(apple.x, 45)
-        self.assertEqual(apple.y, 67)
-        self.assertEqual(apple.value, 1)
-        self.assertEqual(apple.size, game.size)
-        game.rewards += [ apple ]
+# class TestSnakeGameInitObject(unittest.TestCase):
+#     """
+#     Test that the SnakeGame object behaves as expected.
+#     """
+#     @unittest.skip("skipping test_init")
+#     def test_init(self):
+#         """
+#         Test if we can create a SnakeGame object.
+#         """
+#         data = {
+#             "testing": True,
+#             "height": 640,
+#             "width": 640,
+#             "frames": 30,
+#             "score": 10,
+#             "snake_speed": 5,
+#             "size": 10,
+#             "starting_length": 2,
+#             "auto_tick": False,
+#             "fruits":{
+#                 "apple": lambda dimensions: Fruit("apple", dimensions, 1, color=(200,0,0), frequency=0.05 ),
+#                 # 1 in 20 chance of an apple appearing each second, worth 1 point
+#                 "orange": lambda dimensions: Fruit("orange", dimensions, 10, color=(128,128,0), frequency=0.01 ),
+#                 # 1 in 100 chance of an orange appearing each second, worth 10 points
+#                 "bananna": lambda dimensions: Fruit("bananna", dimensions, 20, color=(255,255,0), frequency=0.005 ),
+#                 # 1 in 200 chance of an bananna appearing each second, worth 20 points
+#             }
+#         }
+#         game = SnakeGame(**data)
+#         self.assertFalse(game.auto_tick)
+#         self.assertEqual(game.height, data.get("height"))
+#         self.assertEqual(game.width, data.get("width"))
+#         self.assertEqual(game.frames, data.get("frames"))
+#         self.assertEqual(game.score, data.get("score"))
+#         self.assertEqual(game.snake_speed, data.get("snake_speed"))
+#         self.assertEqual(game.size, data.get("size"))
+#         self.assertEqual(game.starting_length, data.get("starting_length"))
+#         self.assertEqual(game.crashed, False)
+#         self.assertEqual(game.playing, False)
+#         self.assertEqual(game.next_fruit, None)
+#         # self.assertEqual(game.obstacles, [])
+#         self.assertEqual(len(game.obstacles), 4)
+#         self.assertEqual(game.rewards, [])
+#         apple = game.fruits.get("apple")([ 45, 67, game.size])
+#         self.assertIsInstance(apple, Fruit)
+#         self.assertEqual(apple.frequency, 0.05)
+#         self.assertEqual(apple.color, (200,0,0))
+#         self.assertEqual(apple.x, 45)
+#         self.assertEqual(apple.y, 67)
+#         self.assertEqual(apple.value, 1)
+#         self.assertEqual(apple.size, game.size)
+#         game.rewards += [ apple ]
 
-        self.assertEqual(game.next_cmd, None)
+#         self.assertEqual(game.next_cmd, None)
 
-        # self.assertEqual(game.game_state, None)
+#         # self.assertEqual(game.game_state, None)
 
-        self.assertNotEqual(game.game_state, None)
-        self.assertEqual(len(game.game_state), 4)
-        game_state, obstacles, rewards, (snake_segs, snake_belly) = game.game_state
+#         self.assertNotEqual(game.game_state, None)
+#         self.assertEqual(len(game.game_state), 4)
+#         game_state, obstacles, rewards, (snake_segs, snake_belly) = game.game_state
 
-        self.assertEqual(game.playing, game_state[0])
-        self.assertEqual(game.crashed, game_state[1])
-        self.assertEqual(game.score, game_state[2])
-        self.assertEqual(game.size, game_state[3])
-        self.assertEqual(game.height, game_state[4])
-        self.assertEqual(game.width, game_state[5])
-        self.assertEqual(game.snake_speed, game_state[6])
-        self.assertEqual(game.auto_tick, game_state[7])
+#         self.assertEqual(game.playing, game_state[0])
+#         self.assertEqual(game.crashed, game_state[1])
+#         self.assertEqual(game.score, game_state[2])
+#         self.assertEqual(game.size, game_state[3])
+#         self.assertEqual(game.height, game_state[4])
+#         self.assertEqual(game.width, game_state[5])
+#         self.assertEqual(game.snake_speed, game_state[6])
+#         self.assertEqual(game.auto_tick, game_state[7])
 
-        self.assertEqual(len(game.obstacles), len(obstacles))
-        self.assertEqual([ob.dimensions for ob in game.obstacles], obstacles)
+#         self.assertEqual(len(game.obstacles), len(obstacles))
+#         self.assertEqual([ob.dimensions for ob in game.obstacles], obstacles)
 
-        self.assertEqual(len(game.rewards), len(rewards))
-        self.assertEqual([[rw.dimensions, rw.value] for rw in game.rewards], rewards)
+#         self.assertEqual(len(game.rewards), len(rewards))
+#         self.assertEqual([[rw.dimensions, rw.value] for rw in game.rewards], rewards)
 
-        self.assertEqual(game.snake.belly, snake_belly)
-        self.assertEqual([[sg.dimensions, sg.heading] for sg in game.snake.segments], snake_segs)
-        self.assertEqual(game.next_cmd, None)
-        # game._spawn_next_cmd_tester()
-        # game._spawn_game_state_tester()
-        # spawn_next_cmd_tester(game,0)
+#         self.assertEqual(game.snake.belly, snake_belly)
+#         self.assertEqual([[sg.dimensions, sg.heading] for sg in game.snake.segments], snake_segs)
+#         self.assertEqual(game.next_cmd, None)
+#         # game._spawn_next_cmd_tester()
+#         # game._spawn_game_state_tester()
+#         # spawn_next_cmd_tester(game,0)
 
-        # game.next_cmd = 0
-        # self.assertEqual(str(game.next_cmd), "0")
+#         # game.next_cmd = 0
+#         # self.assertEqual(str(game.next_cmd), "0")
 
-        # debug(vars(game))
-        # debug(dir(game))
-        # debug(game.__dict__)
-        # debug(game.__getattribute__("next_cmd"))
+#         # debug(vars(game))
+#         # debug(dir(game))
+#         # debug(game.__dict__)
+#         # debug(game.__getattribute__("next_cmd"))
 
-        # _SnakeGame__next_cmd
-        # debug(f"input {game._SnakeGame__input.poll()}")
-        # debug(f"output {game._SnakeGame__output.poll()}")
-        # pp("TESTING")
-        # pp(game.next_cmd)
-        # game.next_cmd = 0
-        # pp(game.next_cmd)
-        # # self.assertEqual(str(game.next_cmd), "0")
+#         # _SnakeGame__next_cmd
+#         # debug(f"input {game._SnakeGame__input.poll()}")
+#         # debug(f"output {game._SnakeGame__output.poll()}")
+#         # pp("TESTING")
+#         # pp(game.next_cmd)
+#         # game.next_cmd = 0
+#         # pp(game.next_cmd)
+#         # # self.assertEqual(str(game.next_cmd), "0")
 
 def test_setting_next_cmd(self,value):
     self.next_cmd = value
@@ -147,6 +150,7 @@ def test_getting_game_state(self):
     # assert
 
 data = {
+    "testing": True,
     "height": 100,
     "width": 100,
     "frames": 1,
@@ -174,6 +178,7 @@ class TestSnakeGameObject(unittest.TestCase):
     """
     def setUp(self):
         data = {
+            "testing": True,
             "height": 352,
             "width": 352,
             "frames": 30,
@@ -194,6 +199,7 @@ class TestSnakeGameObject(unittest.TestCase):
         }
         self.game = SnakeGame(**data)
 
+    # @unittest.skip("skipping test_point_gen")
     def test_point_gen(self):
         """
         Test SnakeGame object ability to generate a random point safely.
@@ -210,6 +216,7 @@ class TestSnakeGameObject(unittest.TestCase):
             self.assertTrue(point[0]%self.game.size == 0)
             self.assertTrue(point[1]%self.game.size == 0)
 
+    # @unittest.skip("skipping test_germ")
     def test_germ(self):
         """
         Test SnakeGame object ability to limit the number of rewards.
@@ -237,12 +244,14 @@ class TestSnakeGameCmdProcesses(unittest.TestCase):
     expected when acted upon by multiple processes.
     """
     def setUp(self):
+        debug("TestSnakeGameCmdProcesses.setUp")
         global_game.playing = True
         global_game.crashed = False
         global_game.snake.segments = [Segment([9, 57, 1, 3], 2)]
         # headed south
         self.proc = multiprocessing.Process(target=test_setting_next_cmd, args=(global_game, ))
         
+    # @unittest.skip("skipping test_cmd_null")
     def test_cmd_null(self):
         """
         Test command is None initially.
@@ -254,6 +263,7 @@ class TestSnakeGameCmdProcesses(unittest.TestCase):
         # progress the game to the next state
         self.assertEqual(global_game.next_cmd, None)
 
+    # @unittest.skip("skipping test_cmd_move")
     def test_cmd_move(self):
         """
         Test if we can share a SnakeGame object between processes.
@@ -292,28 +302,98 @@ class TestSnakeGameCmdProcesses(unittest.TestCase):
         self.assertEqual(new_position[0].h, global_game.snake.size)
         # self.assertEqual(new_position[0].h, global_game.snake.size)
         # self.assertEqual(new_position[0].h, old_position[0].h)
-# old_position
-# new_position
 
+    # @unittest.skip("skipping test_state_change")
+    def test_state_change(self):
+        """
+        Test if we can properly export the state of the game
+        """
+        import copy
+        old_heading = global_game.snake.heading
+        new_heading = (old_heading+1)%4
+        # have the snake turn to it's relative right (west)
+        self.assertNotEqual(old_heading, new_heading)
 
-    # def test_cmd_quit(self):
-    #     """
-    #     Test if we can share a SnakeGame object between processes.
-    #     """
-    #     global_game.playing = True
-    #     self.assertEqual(global_game.next_cmd, None)
-    #     old_heading = global_game.snake.heading
-    #     new_heading = (old_heading+1)%4
-    #     # have the snake turn to it's relative right
-    #     proc = multiprocessing.Process(target=test_setting_next_cmd, args=(global_game, new_heading, ))
-    #     # create a separate process that will set the new command
-    #     self.assertEqual(global_game.next_cmd, None)
-    #     self.assertEqual(global_game.snake.heading, old_heading)
-    #     proc.start()
-    #     proc.join()
-    #     # execute the new command
-    #     self.assertFalse(global_game.playing)
-    #     self.assertTrue(global_game.crashed)
+        self.assertEqual(global_game.snake.heading, old_heading)
+        old_position = global_game.snake.segments
+        test_setting_next_cmd(global_game, new_heading)
+        self.assertEqual(global_game.next_cmd, new_heading)
+        # show that the game received the command and has it cached
+        initial_state = copy.deepcopy(global_game.game_state)
+        # hold onto the current game state
+        
+        global_game.next_fruit = global_game.fruit_chances[0][0]
+        # set the game to spawn a fruit of a given name
+        global_game.spawn_next_fruit()
+        # spawn it into the game's listed rewards
+        fruit_state = copy.deepcopy(global_game.game_state)
+        # hold onto the current game state
+        fruit = global_game.rewards[0]
+        fruit.value = 1
+        # set the value to 1 so we can test snake belly, length, and movement
+        global_game.snake.interact(fruit)
+        # declare that the snake should interact with this new fruit
+        ate_state = copy.deepcopy(global_game.game_state)
+        # hold onto the game state after the snake ate the fruit
+        global_game.rewards = global_game.rewards[1:]
+        # remove the "eaten" fruit
+        no_fruit_state = copy.deepcopy(global_game.game_state)
+        # hold onto the game state after we've removed the fruit
+        # debug("BEFORE TURN")
+        global_game.update()
+        # progress the game to the next state, presumably using next_cmd
+        # debug("AFTER TURN")
+        turn_state = copy.deepcopy(global_game.game_state)
+        # hold onto the game state now that the snake has "turned" right 
+
+        self.assertEqual(global_game.next_cmd, None)
+        # show that the game has consumed the command
+        self.assertNotEqual(global_game.snake.heading, old_heading)
+        # the snake is no longer using the old heading
+        self.assertEqual(global_game.snake.heading, new_heading)
+        # the snake is using the new heading
+
+        self.assertEqual(global_game.next_cmd, None)
+        test_setting_next_cmd(global_game, new_heading)
+        self.assertEqual(global_game.next_cmd, new_heading)
+        # show that the game received the command and has it cached
+        self.assertNotEqual(global_game.next_cmd, None)
+        # debug("BEFORE RUN")
+        global_game.update()
+        # debug("AFTER RUN")
+        # progress the game to the next state, presumably using next_cmd
+        run_state = copy.deepcopy(global_game.game_state)
+        # hold onto the game state now that the snake has "run" forward
+        pretty_state = lambda st: json.dumps(SnakeGame.label_state(st),indent=4,separators=(",",": "))
+        # debug(f"initial_state: {initial_state}")
+        # debug(f"initial_state: {pretty_state(list(initial_state))}")
+        # debug(f"fruit_state: {pretty_state(list(fruit_state))}")
+        # debug(f"ate_state: {pretty_state(list(ate_state))}")
+        # debug(f"no_fruit_state: {pretty_state(list(no_fruit_state))}")
+        # debug(f"run_state: {pretty_state(list(run_state))}")
+        # debug(f"turn_state: {pretty_state(list(turn_state))}")
+        states = {
+            "initial_state":initial_state,
+            "fruit_state":fruit_state,
+            "ate_state":ate_state,
+            "no_fruit_state":no_fruit_state,
+            "turn_state":turn_state,
+            "run_state":run_state,
+        }
+        for name,state in states.items():
+            # for each intermediary state
+            for nm,st in states.items():
+                # compare it to all the other intermediary states
+                if nm == name:
+                    # if its the same name 
+                    self.assertTrue(SnakeGame.compare_states(state,st), f"{name} did not match {nm}!")
+                    # it should be the same state
+                else:
+                    # otherwise,
+                    self.assertFalse(SnakeGame.compare_states(state,st), f"{name} matched {nm}!")
+                    # something should have always changed between these states
+        self.assertTrue(SnakeGame.compare_states(run_state, global_game.game_state))
+        self.assertListEqual(run_state, global_game.game_state)
 
 if __name__ == '__main__':
     unittest.main()
