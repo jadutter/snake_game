@@ -1,34 +1,11 @@
 #!/usr/bin/python3.7
 import argparse
+import logging
 from auxillary import *
-# from parsing.mode import GameModeArgumentParser
-from yaml import safe_load as yaml_safe_load
-from yaml import YAMLError
 
 try:
-    # open the yaml file
-    with open(os.path.join(
-            os.path.dirname(__file__),
-            "../logging_config.yml"), "r") as f:
-        cfg = yaml_safe_load(f)
-        # and parse the yaml data into a python dict
-    log_folder = cfg.pop("log_folder")
-    # get the directory where we want the log files to reside
-    if not os.path.isdir(log_folder):
-        # if the directory does not exist
-        os.mkdir(log_folder)
-        # make the directory
-    for name,hdlr in cfg.get("handlers").items():
-        # for each handler in the config
-        if "filename" in hdlr:
-            # if the handler has a filename attribute
-            cfg["handlers"][name]["filename"] = os.path.join(log_folder, hdlr.get("filename"))
-            # set the file to reside in the log directory we want to use
-    logging.config.dictConfig(cfg)
-    # use the dict to configure the most of the logging setup
-    logr = logging.getLogger("Parsing")
-    # get a logger
-
+    logr = logging.getLogger("Parser")
+    # get a logger 
     log = logr.log
     crit = logr.critical
     error = logr.error
@@ -37,34 +14,14 @@ try:
     debug = logr.debug
     # take the logger methods that record messages and 
     # convert them into simple one word functions
-    # debug("START")
-    # debug(debug)
-    try:
-        info_handlers = [ hdl for hdl in logr.handlers 
-            if hasattr(hdl,"stream") and 
-                hasattr(hdl,"level") and 
-                int(hdl.level) <= 20 ]
-        if len(info_handlers) > 0:
-            progress_bars = [ ProgressBar(h.stream) for h in info_handlers if h.stream.name == "<stdout>"]
-    except Exception as err:
-        debug("Failed to create progress bars:{}".format(str(err)))
     assert debug == getattr(logr,"debug"), "Something went wrong with getting logging functions..."
     # the logger method called "debug", should now be the same as our function debug()
-except YAMLError as err:
-    logging.critical("Failed to read yaml file.")
-    logging.exception(err)
-    # print the message to the root logger
-    raise err
 except Exception as err:
-    logging.critical("Failed to configure logging.")
+    logging.critical("Failed to configure logging for Parser.")
     logging.exception(err)
     # print the message to the root logger
     raise err
-finally:
-    del cfg
-    del f
-    del yaml_safe_load
-    del YAMLError
+
 
 class SnakeGameArgumentParser(argparse.ArgumentParser):
     """
@@ -112,38 +69,38 @@ class SnakeGameArgumentParser(argparse.ArgumentParser):
                             type=str,
                             metavar="MODE {}".format(metavar_set(["computer","human"])),
                             help="Select who will be playing this game.\n{}".format("KEYWORDS={}".format(metavar_set(self.select_options.keys()))))
+        game_args.add_argument("--player_name", "-pn",
+                            type=str,
+                            default="ANON",
+                            help="Who is playing the game.")
         game_args.add_argument("--size", "-sz",
                             type=int,
                             default=10,
                             help="How many pixels a virtual pixel uses (determines snake and fruit width).")
-        game_args.add_argument("--speed", "-sp",
+        game_args.add_argument("--snake_speed", "--speed", "-sp",
                             type=int,
                             default=10,
                             help="How fast the snake must move.")
-        game_args.add_argument("--width", "-w",
+        game_args.add_argument("--width", "-wt",
                             type=int,
                             default=64,
                             help="The height and width of the game in virtual pixels.")
-        # cmd_subparsers = self.add_subparsers(
-                    #         # prog="mode",
-                    #         parser_class=GameModeArgumentParser,
-        #                     # title="COMMANDS",
-        #                     # dest="cmd", 
-        #                     # description="Valid operations to perform.",
-        #                     # help="Valid command options.",
-        #                     )
-        # # parser_a = cmd_subparsers.add_parser("select_mode",
-        # #                     description="Select who will be playing this game.",
-        # #                     help="Select who will be playing this game.",
-        # #                     )
-        # parser_b = cmd_subparsers.add_parser("mode",
-        #                   prog="mode",
-        #                   # dest="mode",
-        #                     metavar=["player","ai"],
-        #                     description="Select who will be playing this game.",
-        #                     help="Select who will be playing this game.",)
+        game_args.add_argument("--height", "-ht",
+                            type=int,
+                            default=64,
+                            help="The height and width of the game in virtual pixels.")
+        game_args.add_argument("--disable_auto_tick","-dat",
+                            action="store_false",
+                            help="auto_tick is when the snake will continue to move in the direction it was last commanded.")
+        game_args.add_argument("--frames","-fr",
+                            type=int,
+                            default=30,
+                            help="How many frames to render per second")
+        game_args.add_argument("--testing","-t",
+                            action="store_true",
+                            help="Designate that we're testing.")
 
-    def parse_args(self, args=None, namespace=None):
+    def parse_known_args(self, args=None, namespace=None):
         """
         Parse and validate args.
         """
@@ -229,11 +186,10 @@ class SnakeGameArgumentParser(argparse.ArgumentParser):
                 else:
                     return
             return __wrap_log_fnc
-        if namespace == None:
-            if args is not None and len(args) > 0:
-                namespace = super(SnakeGameArgumentParser, self).parse_args(args=args)
-            else:
-                namespace = super(SnakeGameArgumentParser, self).parse_args()
+        if args is not None and len(args) > 0:
+            namespace, args = super(SnakeGameArgumentParser, self).parse_known_args(args=args)
+        else:
+            namespace, args = super(SnakeGameArgumentParser, self).parse_known_args()
         # doing everything the ArgumentParser class would do,
         # and get the namespace it returns
         if namespace.verbose:
@@ -265,5 +221,5 @@ class SnakeGameArgumentParser(argparse.ArgumentParser):
         except Exception as err:
             crit("Failed to setup namespace.", extra={ "err": err, "tb": get_tb()})
             namespace = None
-        return namespace
+        return namespace, args
 

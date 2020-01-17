@@ -16,6 +16,7 @@ class Fruit(object):
         self.dimensions = dimensions
         self.color = kwargs.get("color", (200, 200, 200) )
         self.frequency = kwargs.get("frequency", )
+        self.id = None
 
     def render(self):
         """
@@ -51,6 +52,12 @@ class Fruit(object):
         Getter for the vertical position.
         """
         return self.dimensions[1]
+    @property
+    def origin(self):
+        """
+        Getter for the x,y position.
+        """
+        return self.dimensions[0], self.dimensions[1]
     @property
     def size(self):
         """

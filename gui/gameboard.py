@@ -5,15 +5,18 @@ del contextlib
 # from auxillary import trace_call_path
 import logging
 import time
+import datetime
 import re
 import os
 import copy
 import json
+# import imageio
+import tempfile
 from interfaces.game import SnakeGame
 
 try:
     if "logr" not in globals():
-        logr = logging.getLogger("MainApp")
+        logr = logging.getLogger("GUI")
         # get a logger
         log = logr.log
         crit = logr.critical
@@ -32,6 +35,17 @@ except Exception as err:
     raise err
 finally:
     pass
+# def get_temp_path():
+#     try:
+#         if sys.platform.find("win"):
+#             path = os.path.realpath(os.path.normpath(os.path.expanduser(os.path.expandvars("%TEMP%"))))
+#         elif sys.platform.find():
+#         path = os.path.dirname(__file__)
+#     except Exception as err:
+#         path = os.path.dirname(__file__)
+#     finally:
+#         return path
+
 class Gameboard(object):
     """
     Setup a pygame window to render the current state of the Snake Game
@@ -41,7 +55,7 @@ class Gameboard(object):
         "icon": "./resources/snake_iconx32.png",
         "background": (0,0,0),
         "obstacle_color": (0,0,255),
-        "screenshot_path": "./screenshots/",
+        # "screenshot_path": "./screenshots/",
         # "snake_color": lambda i,t: (0,255-min(i/t*255, 10),0),
         "fonts":{
             "normal": {
@@ -111,10 +125,18 @@ class Gameboard(object):
             self.fonts[name]["size"] = min(32, max(10,round(self.width/640*font.get("size"))))
         self.key_sequence = []
         self.valid_codes = [ code for name,key_cfg in self.valid_keys.items() for code in key_cfg.get("codes") ]
+        temp_valid_keys = {k:v for k,v in self.valid_keys.items()} 
+        for name,cfg in temp_valid_keys.items():
+            codes = cfg.get("codes")
+            for code in codes:
+                code = str(code)
+                self.valid_keys[code] = {k:v for k,v in cfg.items()}
+                self.valid_keys[code]["name"] = name
+        # self.valid_keys = [ code for name,key_cfg in self.valid_keys.items() for code in key_cfg.get("codes") ]
         self.latest_state = None
         self.screenshot_counter = 0
-        if isinstance(self.screenshot_path,str):
-            self.screenshot_path = os.path.realpath(os.path.normpath(os.path.expanduser(os.path.expandvars(self.screenshot_path))))
+        # if isinstance(self.screenshot_path,str):
+        #     self.screenshot_path = os.path.realpath(os.path.normpath(os.path.expanduser(os.path.expandvars(self.screenshot_path))))
 
     @property
     def testing(self):
@@ -272,38 +294,65 @@ class Gameboard(object):
                 self.game.crashed = True
             elif hasattr(event,"key") and event.key in self.valid_codes:
                 # if its a key that means something
+                name = self.valid_keys.get(str(event.key),{"name":"UNKNOWN_KEY"})["name"]
+                direction = "DN" if event.type == pg.KEYDOWN else "UP"
+                debug(f"{name} {direction} ")
                 self.key_sequence += [(event.key, event.type)]
                 # add it to our list of key events that we need to convey to the game
-        self.key_sequence = self._simplify_pattern(self.key_sequence)
-        # (down, up, down) -> (down)
-        self.key_sequence = self._ensure_persistance(self.key_sequence)
-        # [Av, Bv, B^, Cv, C^, Dv, D^, Ev, Fv, E^, F^... A^] ->
-        #     [Av, Bv, B^, Cv, C^, Dv, D^, Av, Ev, Fv, E^, F^, Av ... A^]
-        self.key_sequence = self._remove_duplicates(self.key_sequence)
-        # [Av, Av, Av, Bv, Av, A^, A^, B^] -> [Av, Bv, Av, A^, B^]
+        if self.game.auto_tick:
+            self.key_sequence = self._simplify_pattern(self.key_sequence)
+            # (down, up, down) -> (down)
+            self.key_sequence = self._ensure_persistance(self.key_sequence)
+            # [Av, Bv, B^, Cv, C^, Dv, D^, Ev, Fv, E^, F^... A^] ->
+            #     [Av, Bv, B^, Cv, C^, Dv, D^, Av, Ev, Fv, E^, F^, Av ... A^]
+            self.key_sequence = self._remove_duplicates(self.key_sequence)
+            # [Av, Av, Av, Bv, Av, A^, A^, B^] -> [Av, Bv, Av, A^, B^]
 
 
-        if self.game.next_cmd is None:
+        if self.game.next_cmd is None and len(self.key_sequence) > 0:
             # if the game is ready to receive its next command
-            # debug(f"self.key_sequence = {self.key_sequence}")
+            debug(f"start key_sequence loop with {self.key_sequence}")
             while self.game.next_cmd is None and self.key_sequence:
-                debug(f"self.key_sequence = {self.key_sequence}")
+                # if the game is ready to accept a command and we've got keys to give
+                debug(f"looping: self.key_sequence = {self.key_sequence}")
                 key_code, key_type = self.key_sequence.pop(0)
                 # get the first code in the sequence; the next key the game should receive
                 if key_type == pg.KEYDOWN:
                     # if the key is pressed
-                    for key_name, key_cfg in self.valid_keys.items():
-                        # for every valid key 
-                        if key_code in key_cfg.get("codes"): 
-                            # if the key event is in the list of approved codes
-                            self.game.next_cmd = key_cfg.get("cmd")
-                            # give the game the corresponding command for that key 
-                            if not any([ (kc == key_code and key_type == pg.KEYDOWN and kt == pg.KEYUP) for (kc,kt) in self.key_sequence]) and key_code in self.move_codes and self.game.playing: 
-                                # if there is no key up in the sequence 
-                                self.key_sequence += [(key_code, key_type)]
-                            break
-        # else:
-        #     debug(f"Waiting for next_cmd to be consumed")
+                    # for key_name, key_cfg in self.valid_keys.items():
+                    #     # for every valid key 
+                    #     if key_code in key_cfg.get("codes"): 
+                    #         # if the key event is in the list of approved codes
+                    #         self.game.next_cmd = key_cfg.get("cmd")
+                    #         # give the game the corresponding command for that key 
+                    #         if not any([ (kc == key_code and key_type == pg.KEYDOWN and kt == pg.KEYUP) for (kc,kt) in self.key_sequence]) and key_code in self.move_codes and self.game.playing: 
+                    #             # if there is no key up in the sequence 
+                    #             self.key_sequence += [(key_code, key_type)]
+                    #         break
+                    if str(key_code) in self.valid_keys:
+                        # if the key code is valid
+                        debug(f"successfully assigned command {self.game.next_cmd}")
+                        key_cfg = self.valid_keys.get(str(key_code))
+                        # get the data associated with the key code
+                        self.game.next_cmd = key_cfg.get("cmd")
+                        # give the game the corresponding command for that key 
+
+                        if not any([ (kc == key_code and key_type == pg.KEYDOWN and kt == pg.KEYUP) for (kc,kt) in self.key_sequence]) and key_code in self.move_codes and self.game.playing: 
+                            # the game auto moves the snake, if there is no key up in the sequence 
+                            self.key_sequence += [(key_code, key_type)]
+                        break
+                    else:
+                        debug(f"key code is invalid")
+                else:
+                    # the key is released, and the game shouldn't get an updated command
+                    pass
+            else:
+                if len(self.key_sequence) > 0:
+                    debug(f"successfully assigned command {self.game.next_cmd}")
+                pass
+        elif len(self.key_sequence) > 0:
+            # debug(f"Waiting for next_cmd {self.game.next_cmd} to be consumed")
+            pass
     def simulate_keys(self, *args, **kwargs):
         valid_directions = {
                 "^": pg.KEYUP,
@@ -380,10 +429,11 @@ class Gameboard(object):
             pg.font.init()
         while self.game.snake.is_alive and self.game.crashed is False:
             # debug(f"self.game.game_state {self.game.game_state}")
-            if isinstance(self.screenshot_path,str) and self.game.game_state is not None:
-                self.screenshot()
+            # if isinstance(self.screenshot_path,str) and self.game.game_state is not None:
+            #     self.get_screenshot()
             self.handle_keys()
             self.game.update()
+            debug("UPDATED GAME")
             self.app_surface.fill(self.background)
             for wall in self.game.obstacles:
                 pg.draw.rect(self.app_surface, self.obstacle_color, wall.render())
@@ -395,59 +445,132 @@ class Gameboard(object):
             # debug(f"snake = {self.game.snake.segments}")
             # debug(f"obstacles = {self.game.obstacles}")
 
+            debug("UPDATE GAMEBOARD")
             self.update()
             if self.game.snake.is_alive is False:
-                info(f"GAME OVER")
+                info(f"GAME OVER with snake length {int(self.game._last_length/self.game.size)}")
+                info(f"Scored {self.game.score} points")
+                debug(f"actual score was {self.game._score} points")
+                debug(f"rewarded for staying alive {self.game.alive_counter} points")
+                debug(f"awarded a total of {self.game.alive_bonus} points for staying alive")
+                msg = ", ".join([f"{c} with value {v}" for (c,v) in self.game.fruit_count])
+                debug(f"awarded a total of {self.game.fruit_bonus} points for eating fruit: {msg}")
+                # debug(f"awarded a total of {self.game.fruit_bonus} points for eating fruit")
                 self.game.snake = None
                 self.game.playing = False
                 break
 
-    def screenshot(self):
-        # def compare_lists(list_a, list_b):
-        #     result = True
-        #     try:
-        #         if isinstance(list_b,list) and isinstance(list_a,list):
-        #             for idx,item in enumerate(list_b):
-        #                 if isinstance(item,list):
-        #                     result = compare_lists(list_a[idx], list_b[idx])
-        #                 else:
-        #                     result = (list_a[idx] == list_b[idx])
-        #                 if result is False:
-        #                     break
-        #         else:
-        #             result = (list_a == list_b)
-        #     except Exception as err:
-        #         result = False
-        #         error(f"Gameboard.screenshot.compare_lists error: {err}")
-        #     finally:
-        #         return result
-        # if self.latest_state != self.game.game_state:
-        #     # if the state we last took a screenshot does not match the current state of the game
-        #     self.latest_state = self.game.game_state
-
-        current_state = copy.deepcopy(self.game.game_state)
-        # create a copy of the current game state
-        filename = f"screenshot-{self.screenshot_counter:0>7}.png"
-        filename = os.path.join(self.screenshot_path,filename)
-        if self.testing is False:
-            debug(f"Next screenshot {filename}")
-        pretty_state = lambda st: json.dumps(SnakeGame.label_state(st),indent=4,separators=(",",": "))
-        if self.game.playing:
-            if not SnakeGame.compare_states(self.latest_state, current_state):
-                # if the state of the last screenshot taken does not
-                # match the current state of the game
+    def _save_png(self, base_filename=None, filename=None):
+        try:
+            if filename is None:
+                if base_filename is None:
+                    base_filename = f"screenshot-{self.screenshot_counter:0>7}.png"
+                filename = os.path.join(self.screenshot_path, base_filename)
+            if isinstance(filename,str):
+                info(f"Saving {base_filename}")
                 debug(f"Saving {filename}")
                 pg.image.save(self.app_surface, filename)
-                # save a screenshot of the current game
-                self.latest_state = copy.deepcopy(current_state)
-                # hold onto the latest state of the game
-                self.screenshot_counter += 1
+            # elif filename is not None:
+            #     debug("Saving temp file")
+            #     filename.write(pg.image.tostring(self.app_surface, "RGBA"))
+            #     filename.seek(0)
             else:
-                # if self.testing is False:
-                #     debug(f"self.latest_state {pretty_state(self.latest_state)}")
-                #     debug(f"current_state {pretty_state(current_state)}")
-                #     debug(f"Can't save screenshot because no change detected")
-                self.latest_state = copy.deepcopy(current_state)
+                error(f"Failed to save png: filename = {filename}")
+        except Exception as err:
+            error(f"Failed to save png: {err}")
+            if filename is not None:
+                filename = None
+        finally:
+            return filename
+
+    # def _png_gen(self, base_filename=None, filename=None):
+    #     try:
+    #         if base_filename is None:
+    #             base_filename = f"game-{self.screenshot_counter:0>7}.png"
+    #         png = os.path.join(tempfile.gettempdir(), base_filename)
+    #         while True:
+    #     except Exception as err:
+    #         error(f"Failed to save png: {err}")
+    #         if filename is not None:
+    #             filename = None
+    #     finally:
+    #         pass
+    def _append_gif(self, base_filename=None):
+        if base_filename is None:
+            # base_filename = f"game-{self._start_game_time}.gif"
+            base_filename = f"game.gif"
+        filename = os.path.join(self.screenshot_path, base_filename)
+
+        err = None
+        png = None
+        try:
+            png = os.path.join(tempfile.gettempdir(), base_filename).replace("game.gif",f"game-{self.screenshot_counter:0>7}.png")
+            # get a path for a png in the temporary directory
+            debug(f"Writing to {png}")
+            pg.image.save(self.app_surface, png)
+            # save the current surface as a png file
+
+            images = []
+            if os.path.isfile(filename):
+                for frame in imageio.mimread(filename):
+                    images.append(frame)
+            debug(f"Reading {png}")
+            images.append(imageio.imread(png))
+            # have imageio read the png file,
+            with imageio.get_writer(filename, mode='I') as gif:
+                # open the gif file
+                # debug(f"Image is {image}")
+                debug(f"Appending {filename} via {gif}")
+                for img in images:
+                    gif.append_data(img)
+                # add the png to the gif as a new frame
+            if isinstance(png, str) and os.path.isfile(png):
+                # if we've got a png file we were using
+                os.remove(png)
+                # remove the temporary file
+        except Exception as err:
+            error(f"Failed to save gif: {err}")
+            raise err
+
+    def get_screenshot(self):
+        # # pretty_state = lambda st: json.dumps(SnakeGame.label_state(st),indent=4,separators=(",",": "))
+        # # def set_ext(file,exten):
+        # #     exten = exten.replace(".","")
+        # #     name,ext = os.path.splitext(file)
+        # #     return f"{name}.{exten}"
+        # # def convert_screenshots(folder,*args,**kwargs):
+        # #     gif = kwargs.get("name","movie")
+        # #     gif = set_ext(gif,"gif")
+        # #     gif = os.path.join(folder,gif)
+        # #     screenshots = [image for image in os.listdir(folder) if os.path.splitext(image)[1].find("gif") == -1]
+        # #     screenshots = [os.path.join(folder,image) for image in screenshots]
+        # #     # print(screenshots)
+        # #     with imageio.get_writer(gif, mode='I') as f:
+        # #         for filename in screenshots:
+        # #             image = imageio.imread(filename)
+        # #             f.append_data(image)
+        # # self._start_game_time
+        # if self.game.playing:
+        #     current_state = copy.deepcopy(self.game.game_state)
+        #     # create a copy of the current game state
+        #     if not SnakeGame.compare_states(self.latest_state, current_state):
+        #         # if the state of the last screenshot taken does not
+        #         # match the current state of the game
+
+        #         # self._save_png()
+        #         self._append_gif()
+        #         # save a screenshot of the current game
+
+        #         self.screenshot_counter += 1
+        #         self.latest_state = copy.deepcopy(current_state)
+        #         # hold onto the latest state of the game
+        #     else:
+        #         # if self.testing is False:
+        #         #     debug(f"self.latest_state {pretty_state(self.latest_state)}")
+        #         #     debug(f"current_state {pretty_state(current_state)}")
+        #         #     debug(f"Can't save screenshot because no change detected")
+        #         self.latest_state = copy.deepcopy(current_state)
+        pass
 
 
     def update(self,frames=None):
@@ -464,7 +587,9 @@ class Gameboard(object):
         finally:
             if frames is None:
                 frames = self.frames
+            debug("TICK")
             self.game.clock.tick(frames)
+            debug("TOCK")
 
     def draw_score(self):
         font_style = self.fonts.get("normal")
@@ -481,7 +606,7 @@ class Gameboard(object):
     def menu(self):
         debug(f"Gameboard.menu has begun")
         while True:
-            debug(f"Gameboard.handle_keys")
+            # debug(f"Gameboard.handle_keys")
             self.handle_keys()
             # debug(f"Game.update")
             self.game.update()
@@ -534,6 +659,7 @@ class Gameboard(object):
                 self.menu()
                 if self.game.playing:
                     debug(f"Gameboard switching states")
+                    self._start_game_time = datetime.datetime.now().strftime("%Y-%m-%dT%H.%M.%S")
                     self.play_game()
                     debug(f"Gameboard done playing {self.game.playing}")
             pg.quit()
@@ -543,18 +669,19 @@ class Gameboard(object):
             raise err
         finally:
             pass
+    # def start(self):
+    #     try:
+    #         import threading
+    #         debug(f"Creating Gameboard._start thread")
+    #         t = threading.Thread(target=Gameboard._start,args=(self,))
+    #         t.start()
+    #     except Exception as err:
+    #         error(f"Gameboard.start has failed: {err}")
+    #         raise err
+    #     finally:
+    #         debug(f"Gameboard.start completed")
     def start(self):
-        try:
-            import threading
-            debug(f"Creating Gameboard._start thread")
-            t = threading.Thread(target=Gameboard._start,args=(self,))
-            t.start()
-        except Exception as err:
-            error(f"Gameboard.start has failed: {err}")
-            raise err
-        finally:
-            debug(f"Gameboard.start completed")
-
+        self._start()
 
     @property
     def frames(self):

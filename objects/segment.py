@@ -53,6 +53,7 @@ class Segment(object):
             # if the height is longer than the width
             assert (self.heading%2 == 0), "Heading does not match up with the longest dimension"
             # heading should be an even number to indicate north or south
+        self.id = None
 
     def render(self):
         """

@@ -1,85 +1,27 @@
 #!/usr/bin/python3.7
 import argparse
+import logging
 from auxillary import *
-# from yaml import safe_load as yaml_safe_load
-# from yaml import YAMLError
 
-# try:
-#     # open the yaml file
-#     with open(os.path.join(
-#             os.path.dirname(__file__),
-#             "../logging_config.yml"), "r") as f:
-#         cfg = yaml_safe_load(f)
-#         # and parse the yaml data into a python dict
-#     log_folder = cfg.pop("log_folder")
-#     # get the directory where we want the log files to reside
-#     if not os.path.isdir(log_folder):
-#         # if the directory does not exist
-#         os.mkdir(log_folder)
-#         # make the directory
-#     for idx,hdlr in enumerate(cfg.get("handlers")):
-#         # for each handler in the config
-#         if "filename" in hdlr:
-#             # if the handler has a filename attribute
-#             cfg["handlers"][idx] = os.path.join(log_folder, hdlr.get("filename"))
-#             # set the file to reside in the log directory we want to use
-#     logging.config.dictConfig(cfg)
-#     # use the dict to configure the most of the logging setup
-#     logr = logging.getLogger("Parser")
-#     # get a logger for our main
-#     # logr.addFilter(StackContextFilter())
-#     # logr.addFilter(TraceContextFilter())
-#     # # register our context filters to the logger
-#     log = logr.log
-#     crit = logr.critical
-#     error = logr.error
-#     warn = logr.warning
-#     info = logr.info
-#     debug = logr.debug
-#     # take the logger methods that record messages and 
-#     # convert them into simple one word functions
-#     # debug("START")
-#     # debug(debug)
-#     try:
-#         # rollover_files = ["/var/log/aps_cmds/detailed_errors.log"]
-#         # # get handlers that we want to do a rollover when the script starts
-#         # handlers = [ hdl for hdl in logr.handlers 
-#         #     if hasattr(hdl,"stream") and 
-#         #         hasattr(hdl.stream,"name") and 
-#         #         hdl.stream.name in rollover_files]
-#         # if handlers:
-#         #     for hdl in handlers:
-#         #         hdl.doRollover()
-#         # get handlers that we want to do a rollover when the script starts
+try:
+    logr = logging.getLogger("Parser")
+    # get a logger 
+    log = logr.log
+    crit = logr.critical
+    error = logr.error
+    warn = logr.warning
+    info = logr.info
+    debug = logr.debug
+    # take the logger methods that record messages and 
+    # convert them into simple one word functions
+    assert debug == getattr(logr,"debug"), "Something went wrong with getting logging functions..."
+    # the logger method called "debug", should now be the same as our function debug()
+except Exception as err:
+    logging.critical("Failed to configure logging for Parser.")
+    logging.exception(err)
+    # print the message to the root logger
+    raise err
 
-#         # progress_bar = (lambda x,y:print(x/y))
-#         info_handlers = [ hdl for hdl in logr.handlers 
-#             if hasattr(hdl,"stream") and 
-#                 hasattr(hdl,"level") and 
-#                 int(hdl.level) <= 20 ]
-#         if len(info_handlers) > 0:
-#             # progress_bars = [ ProgressBar(h.stream) for h in info_handlers ]
-#             progress_bars = [ ProgressBar(h.stream) for h in info_handlers if h.stream.name == "<stdout>"]
-#     except Exception as err:
-#         # debug("Failed to rollover detailed_errors.log:{}".format(str(err)))
-#         debug("Failed to create progress bars:{}".format(str(err)))
-#     assert debug == getattr(logr,"debug"), "Something went wrong with getting logging functions..."
-#     # the logger method called "debug", should now be the same as our function debug()
-# except YAMLError as err:
-#     logging.critical("Failed to read yaml file.")
-#     logging.exception(err)
-#     # print the message to the root logger
-#     raise err
-# except Exception as err:
-#     logging.critical("Failed to configure logging.")
-#     logging.exception(err)
-#     # print the message to the root logger
-#     raise err
-# finally:
-#     del cfg
-#     del f
-#     del yaml_safe_load
-#     del YAMLError
 class SnakeAPIArgumentParser(argparse.ArgumentParser):
     """
     Custom ArgumentParser class

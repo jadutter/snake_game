@@ -3,20 +3,23 @@ disable_existing_loggers: False
 log_folder: /Home/Code/game_3/logs/
 formatters:
     # https://docs.python.org/3/library/logging.html#logrecord-attributes
+    sql_msg:
+        format: "%(message)s"
     basic:
-        format: "%(asctime)s - %(name)-12s - %(levelname)-8s - %(message)s"
+        format: "%(created)f - %(name)-12s - %(levelname)-8s - %(message)s"
     simple_error_message:
         format: "%(call_trace)s - Line %(lineno)s - %(ex_only)-20s - '''%(ex)s'''"
     detailed_error_message:
-        format: "%(asctime)s - %(name)-12s - %(levelname)-8s - %(call_trace)s - %(message)s - %(stack)s %(locals)s %(globals)s"
+        format: "%(created)f - %(name)-12s - %(levelname)-8s - %(call_trace)s - %(message)s - %(stack)s %(locals)s %(globals)s"
     sanitized_error_message:
-        format: "%(asctime)s - %(filename)-20s - Line %(lineno)-5s -%(ex_only)s"
+        format: "%(created)f - %(filename)-20s - Line %(lineno)-5s -%(ex_only)s"
 
 filters:
     stack_filter:
         (): auxillary.StackContextFilter
     trace_filter:
         (): auxillary.TraceContextFilter
+        "base_fnc": "__wrap_log_fnc"
 
 handlers:
     console:
@@ -101,6 +104,18 @@ handlers:
         backupCount: 1
         encoding: utf8
 
+    # sql_handler:
+    #     class: interfaces.scribe.SQLiteHandler
+    #     level: WARN
+    #     filters: [interfaces.scribe.sql_filter]
+    #     formatter: sql_msg
+    #     database: data.db
+    #     table: events
+    #     schema: SCHEMA_data.sql
+    #     fixtures: FIXTURES_data.sql
+    #     row_factory: dict
+
+
 loggers:
     Aux:
         level: DEBUG
@@ -114,11 +129,15 @@ loggers:
         level: DEBUG
         handlers: [console, info_file_handler, warning_file_handler, error_file_handler, critical_file_handler]
         propagate: no
-    Interface:
+    Iface:
         level: DEBUG
         handlers: [console, info_file_handler, warning_file_handler, error_file_handler, critical_file_handler]
         propagate: no
-    Parsing:
+    IfaceScribe:
+        level: DEBUG
+        handlers: [console, info_file_handler, warning_file_handler, error_file_handler, critical_file_handler]
+        propagate: no
+    Parser:
         level: DEBUG
         handlers: [console, info_file_handler, warning_file_handler, error_file_handler, critical_file_handler]
         propagate: no

@@ -1,1 +1,2 @@
-__all__ = ["startup"]
+from .mainParser import MainArgumentParser
+from .startup import SnakeGameArgumentParser

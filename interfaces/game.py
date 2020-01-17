@@ -7,14 +7,16 @@ from objects.snake import Snake
 from objects.segment import Segment
 from objects.obstacle import Obstacle
 from objects.fruit import Fruit
+from interfaces.scribe import Scribe, get_timestamp
 import multiprocessing
 import logging
 import copy
+import math
 from collections import OrderedDict
 
 try:
     if "logr" not in globals():
-        logr = logging.getLogger("MainApp")
+        logr = logging.getLogger("Iface")
         # get a logger
         log = logr.log
         crit = logr.critical
@@ -31,22 +33,20 @@ except Exception as err:
     logging.exception(err)
     # print the message to the root logger
     raise err
-finally:
-    pass
 
 
-
-# def never_release_lock(self):
-#     if not self.locked():
-#         raise RuntimeError("This lock should never be released by another process")
-#     else:
-#         warn("This lock should never be released")
 
 class SnakeGame(object):
     """
     Setup a game to create and track the current state of the game.
     """
     defaults = {
+        "version": "0.0.0",
+        # what version of the game is being played
+        "player": "ANON",
+        # who is playing the current game
+        "agent": None,
+        # the DQN agent if the player is not human
         "timeout": 100,
         # how long to wait for a response before timing out
         "height": 64,
@@ -68,6 +68,8 @@ class SnakeGame(object):
         "reward_limit": 5,
         # limit how many fruit can be simultaneously created
         "testing": False,
+        # whether we're running unittests 
+        "database": "data.db",
     }
     __valid_keys = {
             "0": 0,
@@ -85,6 +87,7 @@ class SnakeGame(object):
             "6": 6,
             # quit
         }
+    __still_alive_reward_fnc = (lambda x: ((-1*math.atan((x/0.5)-1))+1.7))
     def __init__(self, *args, **kwargs):
         self.__next_cmd = None
         self.__game_state = None
@@ -136,71 +139,22 @@ class SnakeGame(object):
             ValueError(f"Fruits did not return a dictionary containing functions to create Fruit objects {err}")
         
         self.snake = None
-        self.__flow_lock = multiprocessing.RLock()
-        # create a lock that will dictate who can do what to which properties
-        # self.__flow_lock.release = never_release_lock
-        self.__cmd_child, self.__cmd_parent = multiprocessing.Pipe(duplex=True)
-        # create a pipe to receive the next command; 
-        # the Process that instantiated this object should only ever use self.__cmd_child to recieve data, 
-        # while other Processes should use self.__cmd_parent to send data
-        self.__state_child, self.__state_parent = multiprocessing.Pipe(duplex=True)
-        # create a pipe to output the current game state; 
-        # the Process that instantiated this object should only ever use self.__state_child to send data, 
-        # while other Processes should use self.__state_parent to recieve data
-        self.__flow_lock.acquire()
-        # the instatiated object now has ownership of the pipes:
-        #     this process:
-        #         cmd:
-        #             child: listen 
-        #                         for next command
-        #         state:
-        #             child: send 
-        #                         the current state of the game
-        #     other process:
-        #         cmd:
-        #             parent: send 
-        #                         what the next command will be
-        #         state:
-        #             parent: listen 
-        #                         to what the current state of the game is
         self._loop_counter = 0
+        self.__alive_reward_counter = 0
+        self.scribe = Scribe("data.db")
         self.start()
-    # @property
-    # def input(self):
-    #     """
-    #     A pipe to receive the next command.
-    #     """
-    #     # send
-    #     # recv
-    #     # poll
-    #     # exitcode
-    #     if self.__input.poll(self.timeout):
-    #         self.__input.recv()
-    #         # self.__input.recv_bytes(maxlength=16)
-    #     return self.__input
+
+    @property
+    def score(self):
+        """
+        Track how many points have been scored, but return as a whole number.
+        """
+        return int(round(self._score))
     
-    # @input.setter
-    # def input(self, value):
-    #     self.__input = value
-    
-    # @property
-    # def output(self):
-    #     """
-    #     A pipe to output the current game state.
-    #     """
-    #     # send
-    #     # recv
-    #     # poll
-    #     # exitcode
-    #     return self.__output
-    
-    # @output.setter
-    # def output(self, value):
-    #     if self.__flow_lock.locked():
-    #         # if we have ownership of the flow of data
-    #         self.__output = value
-    #     else:
-    #         raise IOError("Do not have permission to write to output")
+    @score.setter
+    def score(self, value):
+        self._score = value
+
     @property
     def _loop_counter(self):
         """
@@ -211,15 +165,7 @@ class SnakeGame(object):
     @_loop_counter.setter
     def _loop_counter(self, value):
         self.__loop_counter = value
-        # if (self.__loop_counter) > self.snake_speed*60
-        # # self.snake_speed/60
-    
-    @property
-    def owns_instance(self):
-        """
-        Whether the calling process owns this instantiated object.
-        """
-        return self.__flow_lock._semlock._is_mine()
+
 
     @property
     def next_cmd(self):
@@ -417,25 +363,6 @@ class SnakeGame(object):
         finally:
             return result
     
-    def _test_next_cmd_setter(self,value):
-        """
-        A method that is used in testing to ensure next_cmd
-        can be set by a separate process.
-        """
-        if not self.owns_instance:
-            self.next_cmd = value
-        else:
-            warn("This should not be called by the Process that owns this object")
-    def _test_game_state_setter(self,value):
-        """
-        A method that is used in testing to ensure game_state
-        can be set by a separate process.
-        """
-        if not self.owns_instance:
-            self.game_state = value
-        else:
-            warn("This should not be called by the Process that owns this object")
-        
     def _set_seed(self, seed):
         self._seed = seed
         self.rand.seed(self._seed)
@@ -448,6 +375,8 @@ class SnakeGame(object):
 
     def _init_rewards(self):
         self.rewards = []
+        # self.scribe.record_fruits(self.rewards)
+
 
     def _init_boundaries(self):
         """
@@ -464,6 +393,7 @@ class SnakeGame(object):
                 Obstacle(-self.size, 0, self.size, self.height),
                 # west wall
             ]
+        # self.scribe.record_obstacles(self.obstacles)
 
     @property
     def can_germinate(self):
@@ -471,9 +401,11 @@ class SnakeGame(object):
         Whethe next_fruit can be set and spawn another reward object.
         """
         return len(self.rewards) < self.reward_limit
+
     @staticmethod
     def __access_fruit_freq(fruit):
         return fruit[1]
+
     def _organize_fruit(self):
         """
         Setup an attribute to track probabilities for the different fruits.
@@ -488,6 +420,7 @@ class SnakeGame(object):
             # for each fruit, least valuable to most valuable, 
             self.__valid_keys[str(idx+7)] = idx+7
             # accept a key that will spawn it 
+
     def get_point(self, depth=0):
         """
         Pick a point within the game boundaries and not currently occupied.
@@ -495,6 +428,7 @@ class SnakeGame(object):
         if depth >= 30:
             error("Went too deep trying to generate a random point")
             return (0,0)
+        debug(f"Getting random point depth = {depth}")
         x = self.rand.randrange(0, self.width, self.size)
         y = self.rand.randrange(0, self.height, self.size)
         if x <= 0 or y <= 0:
@@ -502,44 +436,61 @@ class SnakeGame(object):
             return self.get_point(depth=depth+1)
             # try to get a new random x,y point
         pseudo_segment = Segment([x, y, self.size, self.size],0)
+        debug(f"Checking point {depth} against obstacles")
         for wall in self.obstacles:
             if Snake.intersects(wall, pseudo_segment):
                 debug(f"point {pseudo_segment} intersects with wall")
                 return self.get_point(depth=depth+1)
                 # try to get a new random x,y point
+        debug(f"Checking point {depth} against fruits")
         for fruit in self.rewards:
             if Snake.intersects(fruit, pseudo_segment):
                 debug(f"point {pseudo_segment} intersects with fruit")
                 return self.get_point(depth=depth+1)
                 # try to get a new random x,y point
+        debug(f"Checking point {depth} against Snake segments")
         if self.snake is not None and Snake.intersects(self.snake, pseudo_segment):
             debug(f"point {pseudo_segment} intersects with Snake")
             return self.get_point(depth=depth+1)
             # try to get a new random x,y point
+        debug(f"Point {depth} approved")
         return (x,y)
+
     def get_fruit(self):
         """
         Pick what the next fruit to spawn will be.
         """
         if self.next_fruit is None and self.can_germinate:
             for name,chance in self.fruit_chances:
+                if self.auto_tick:
+                    # if the game is set to automatically progress, regardless of having an 
+                    # active command, 
+                    chance = chance/self.frames
+                    # reduce the chance of spawning by how often get_fruit will be called per second
+                if len(self.rewards) <= 0:
+                    # if there currently are no rewards present
+                    chance = chance*10
+                    # increase the likelihood that there will be a reward spawned
                 if self.rand.random() <= chance:
                     self.next_fruit = name
                     # debug(f"Next fruit will be {self.next_fruit}")
                     break
+
     def spawn_next_fruit(self):
         """
         Instantiate the next fruit object in the game.
         """
         if self.next_fruit in self.fruits and self.can_germinate:
             point = self.get_point()
-            if point is not None:
+            if point is not None and self.scribe.get_state:
                 x,y = point
                 fruit = self.fruits.get(self.next_fruit)([x,y,self.size])
                 self.rewards += [fruit]
                 # debug(f"Next fruit spawned {self.next_fruit}")
+                self.scribe.record_fruits(fruit)
                 self.next_fruit = None
                 return fruit
+
     def _get_snake(self, depth=0):
         """
         Use the current attributes of the game to create a new snake object.
@@ -557,6 +508,7 @@ class SnakeGame(object):
             # safe_distance = int(round(min(self.width, self.height)/10))
             safe_distance = 5
             if self._peek(snake, snake.heading, safe_distance):
+                # self.scribe.record_snake(snake)
                 return snake
             else:
                 if depth >= 30:
@@ -567,6 +519,7 @@ class SnakeGame(object):
             # return a snake object that's within the game boundaries
         else:
             raise ValueError("Failed to pick a random point to spawn the snake")
+
     def spawn_snake(self):
         """
         Spawn a snake for the game
@@ -574,16 +527,113 @@ class SnakeGame(object):
         # debug("Game.spawn_snake")
         if self.snake is None:
             self.snake = self._get_snake()
+
     def start(self):
+        self.obstacles = []
+        # a list of Obstacle objects that would kill the snake
+        self.rewards = []
+        # a list of Fruit objects that would feed the snake
+        self.next_fruit = None
+        # None, or a string to indicate the next Fruit object that should be added
+        self.snake = None
+        # None, or a Snake object
+        self._loop_counter = 0
+        # counter to track whether movement is allowed
+        self.__alive_reward_counter = 0
+        # counter to track how much to reward the player for staying alive this long
+        self._fruit_count = []
+        # how many fruit of which values were consumed
         self._init_randomizer()
         self._organize_fruit()
         self._init_rewards()
         self._init_boundaries()
         self.spawn_snake()
+        self.scribe.record_game_start(self)
+
+    @property
+    def alive_counter(self):
+        """
+        How many times the game awarded some points for they player staying alive
+        """
+        return self.__alive_reward_counter
+
+    @property
+    def alive_bonus(self):
+        """
+        Total points awarded for just staying alive
+        """
+        return sum([SnakeGame.__still_alive_reward_fnc(x) for x in range(self.__alive_reward_counter) ])
+
+    @property
+    def fruit_count(self):
+        """
+        Track how many times each unique fruit is eaten.
+        """
+        return [(cnt,val) for cnt,val in self._fruit_count]
+        # return a list, where each item is a tuple
+
+    def count_fruit(self,value):
+        """
+        A fruit was eaten: increment its counter, or start a counter for it.
+        """
+        if len(self._fruit_count) == 0:
+            # if no fruit have been eaten yet
+            self._fruit_count = [[1,value]]
+            # create a counter tracking that we've awarded this value once
+        else:
+            for idx,(occurences,val) in enumerate(self._fruit_count):
+                # for each fruit value we've awarded
+                if val == value:
+                    # if the values are the same
+                    self._fruit_count[idx] = [occurences+1,value]
+                    # increment the counter
+                    break
+                    # count_fruit has now counted the fruit with value, 
+                    # exit the loop 
+                elif val <= value:
+                    # if the new value is greater than the current 
+                    # value we're checking in the list of counters,
+                    self._fruit_count.insert(idx,[1,value])
+                    # insert a counter after it
+                    break
+                    # count_fruit has now counted the fruit with value, 
+                    # exit the loop 
+    @property
+    def fruit_bonus(self):
+        """
+        Total points awarded for eating fruit
+        """
+        return sum([cnt*val for cnt,val in self._fruit_count])
+    
+
+    def get_still_alive_reward(self):
+        """
+        Award points for staying alive, but award more points towards the start
+        of the game, and less points later on (but never no points)
+        """
+        # experimented with https://www.desmos.com/calculator
+        # to find the right function I wanted to use;
+        # the sliders were very helpful
+        
+        # y = (log(-x+1)+2)/2
+        # y = 1/(1+e^(x*5-5))
+
+        # x = (1-tan(y+1.5))*0.5
+
+        # y = -atan((x/0.5)-1)+1.7
+        # {0 < y <= 3}
+        self.__alive_reward_counter += 1
+        # self._score += ((-1*math.atan((self.__alive_reward_counter/0.5)-1))+1.7)
+        self._score += SnakeGame.__still_alive_reward_fnc(self.__alive_reward_counter)
+        # add the float to the hidden attribute; whereas 'score' will be the rounded
+        # value of _score
+
     def update(self):
         """
         Progress the state of the game forward.
         """
+        debug("UPDATE GAME STATE")
+        state_changed = False
         moved_snake = False
         # 1) get cmd
         # 3) iff cmd exit -> exit
@@ -608,12 +658,13 @@ class SnakeGame(object):
             cmd = int(self.next_cmd)
             if cmd in [4,5,6]:
                 # if it can be immediately used
+                self.scribe.record_command(cmd)
                 self.next_cmd = None
                 # remove the cached command
 
         if cmd == 4:
             # escape/spacebar     pause/play
-            debug("escape/spacebar")
+            info("recv pause/play command")
             self.playing = self.playing is False
             # set the game to be playing if it wasnt,
             # and not playing if it was playing
@@ -621,7 +672,7 @@ class SnakeGame(object):
             # do nothing else during this update call
         elif cmd == 5:
             # restart/start
-            debug("restart/start")
+            info("recv restart command")
             if self.playing is False:
                 # if we were not playing 
                 self.playing = True
@@ -630,7 +681,7 @@ class SnakeGame(object):
                 # do nothing else during this update call
         elif cmd == 6:
             # quit
-            debug("quit")
+            info("recv quit command")
             self.playing = False
             self.crashed = True
             return
@@ -652,33 +703,45 @@ class SnakeGame(object):
                 pass
                 # leave the snake alone
             limit = int(self.frames/self.snake_speed)
+            # if move is not None and (self.auto_tick is False or self._loop_counter >= limit or limit == 1):
             if move is not None and (self._loop_counter >= limit or limit == 1):
                 # if we're allowed to move during this cycle
-                # debug(f"MOVING SNAKE TO {cmd} - {move}")
+                debug(f"MOVING SNAKE TO {cmd} - {move}")
                 self.snake.move(move)
+                state_changed = True
                 self._loop_counter = -1
                 self.get_fruit()
+                self.scribe.record_command(move)
                 self.next_cmd = None
                 # remove the cached command now that we've used it
             # else:
             #     debug(f"no move because {move} is not None and {self._loop_counter} >= {self.frames}/{self.snake_speed}")
             #     debug(f"no move because {move} is not None and {self._loop_counter} >= {int(self.frames/self.snake_speed)}")
             #     debug(f"no move because {move is not None} and {self._loop_counter >= int(self.frames/self.snake_speed)}")
-            for wall in self.obstacles:
+                for wall in self.obstacles:
+                    if self.snake.is_alive:
+                        if self.snake.intersects(self.snake.head,wall):
+                            info(f"Snake hit {wall}")
+                            self.snake.interact(wall)
                 if self.snake.is_alive:
-                    if self.snake.intersects(self.snake.head,wall):
-                        debug(f"Snake hit {wall}")
-                        self.snake.interact(wall)
-            if self.snake.is_alive:
-                for fruit in self.rewards:
-                    if self.snake.intersects(self.snake.head,fruit):
-                        debug(f"Snake hit {fruit}")
-                        self.snake.interact(fruit)
-                        self.rewards.remove(fruit)
+                    for fruit in self.rewards:
+                        if self.snake.intersects(self.snake.head,fruit):
+                            info(f"Snake hit {fruit.name} @ {fruit.origin} worth {fruit.value}")
+                            self.count_fruit(fruit.value)
+                            self.score += fruit.value
+                            self.snake.interact(fruit)
+                            self.rewards.remove(fruit)
+                if self.snake is not None and self.snake.is_alive:
+                    self._last_length = self.snake.length
+                    # store the snake length to be accessed when the game ends and there is no snake
+                    self.get_still_alive_reward()
+                elif self.scribe.get_game_instance:
+                    self.scribe.record_game_end(get_timestamp())
 
             # handle the fruit 
             if cmd is not None and cmd-7 in [i for i in range(0, len(self.fruit_chances))]:
                 # we're told to spawn a specific fruit
+                self.scribe.record_command(cmd)
                 cmd = cmd - 7
                 self.next_fruit = list(reversed(self.fruit_chances))[cmd][0]
                 # store the fruit name
@@ -686,28 +749,26 @@ class SnakeGame(object):
                 # remove the cached command now that we've used it
             elif self.auto_tick:
                 # we're NOT told to spawn a specific fruit, we're currently 
+                reward_qty = len(self.rewards)
                 self.get_fruit()
                 # handle choosing the next fruit to instantiate
+                state_changed = self.next_fruit is not None and self.can_germinate
             self.spawn_next_fruit()
             # handle instantiating the next fruit at a random point
+            if state_changed:
+                self.scribe.record_state({
+                        "score": self.score,
+                        "fruits": self.rewards,
+                        "obstacles": self.obstacles,
+                        "snake": self.snake,
+                    })
         else:
             # the game is currently not playing,
             # we don't need to change the snake or fruit
-            # if cmd in []:
             self.next_cmd = None
+        # if self.scribe.get_game_instance is not None and (self.snake is None or not self.snake.is_alive):
+        #     self.scribe.record_game_end(get_timestamp())
         
-    def play(self):
-        """
-        Change the game to a playing state.
-        """ 
-        self.playing = True
-        
-    def pause(self):
-        """
-        Change the game to a paused state.
-        """ 
-        self.playing = False
-
     def _peek(self, snake, direction, distance):
         """
         Check whether moving the snake in "direction" by "distance" units,
@@ -737,53 +798,3 @@ class SnakeGame(object):
             error(f"Game.peek error: {err}")
         finally:
             return survived
-
-
-    def __getstate__(self):
-        # capture what is normally pickled
-        state = self.__dict__.copy()
-        # state["clock"] = None
-        # # Can't pickle pygame.time.Clock
-        # state["fruit"] = { k:None for k,v in self.fruits.items() }
-        # # Can't pickle lambda functions
-        # state["snake"] = None
-        # state["obstacles"] = []
-        # state["rewards"] = []
-
-        # approved = ["flow_lock","__cmd","__state"]
-        # for k,v in state.items():
-        #     if all([k.find(a) == -1 for a in approved]):
-        #         state[k] = None
-        
-        denied = ["clock"]
-        for k,v in state.items():
-            if k == "fruits":
-                state[k] = { k:None for k,v in self.fruits.items() }
-            elif any([k.find(d) != -1 for d in denied]):
-                state[k] = None
-
-
-        # # replace the `value` key (now an EnumValue instance), with it's index:
-        # state['value'] = state['value'].index
-        # # what we return here will be stored in the pickle
-        return state
-
-    # def __setstate__(self, newstate):
-    #     # re-create the EnumState instance based on the stored index
-    #     newstate['value'] = self.Values[newstate['value']]
-    #     # re-instate our __dict__ state from the pickled state
-    #     self.__dict__.update(newstate)
-
-def spawn_next_cmd_tester(self,value):
-    """
-    """
-    proc = multiprocessing.Process(target=SnakeGame._test_next_cmd_setter,args=(self,value,))
-    proc.start()
-    proc.join()
-    
-def spawn_game_state_tester(self,value):
-    """
-    """
-    proc = multiprocessing.Process(target=SnakeGame._test_game_state_setter,args=(self,value,))
-    proc.start()
-    proc.join()

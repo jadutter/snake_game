@@ -1,10 +1,10 @@
-from parsing import *
-from auxillary import *
-from objects import *
+import shlex
+import logging
+import logging.config
+import os
 from yaml import safe_load as yaml_safe_load
 from yaml import YAMLError
-from gui.gameboard import Gameboard
-from interfaces.game import SnakeGame
+from auxillary import dir_path
 
 try:
     # open the yaml file
@@ -15,7 +15,7 @@ try:
         # and parse the yaml data into a python dict
     log_folder = cfg.pop("log_folder")
     # get the directory where we want the log files to reside
-    if not os.path.isdir(log_folder):
+    if not dir_path(log_folder, suppress=True):
         # if the directory does not exist
         os.mkdir(log_folder)
         # make the directory
@@ -37,17 +37,23 @@ try:
     debug = logr.debug
     # take the logger methods that record messages and 
     # convert them into simple one word functions
-    try:
-        info_handlers = [ hdl for hdl in logr.handlers 
-            if hasattr(hdl,"stream") and 
-                hasattr(hdl,"level") and 
-                int(hdl.level) <= 20 ]
-        if len(info_handlers) > 0:
-            progress_bars = [ ProgressBar(h.stream) for h in info_handlers if h.stream.name == "<stdout>"]
-    except Exception as err:
-        debug("Failed to create progress bars:{}".format(str(err)))
+    # try:
+    #     info_handlers = [ hdl for hdl in logr.handlers 
+    #         if hasattr(hdl,"stream") and 
+    #             hasattr(hdl,"level") and 
+    #             int(hdl.level) <= 20 ]
+    #     if len(info_handlers) > 0:
+    #         progress_bars = [ ProgressBar(h.stream) for h in info_handlers if h.stream.name == "<stdout>"]
+    # except Exception as err:
+    #     debug("Failed to create progress bars:{}".format(err))
+
     assert debug == getattr(logr,"debug"), "Something went wrong with getting logging functions..."
     # the logger method called "debug", should now be the same as our function debug()
+
+    from auxillary import *
+    from parsing import *
+    from gui.gameboard import Gameboard
+    from interfaces.game import SnakeGame
 except YAMLError as err:
     logging.critical("Failed to read yaml file.")
     logging.exception(err)
@@ -64,60 +70,17 @@ finally:
     del yaml_safe_load
     del YAMLError
 
-def test_locking():
-    import multiprocessing
-    testLock = multiprocessing.RLock()
-    debug(testLock)
-    debug(dir(testLock))
-    debug(dir(testLock._semlock))
-    # debug(dir(multiprocessing.RLock))
-    # debug(testLock._semlock._count())
-    debug(testLock._semlock._get_value())
-    debug(testLock._semlock._is_mine())
-    testLock.acquire()
-    # debug(testLock._semlock._count())
-    debug(testLock._semlock._get_value())
-    debug(testLock._semlock._is_mine())
-    testLock.release()
-    debug(testLock._semlock._get_value())
-    debug(testLock._semlock._is_mine())
-    # debug(testLock._rand)
-    debug(testLock)
-
-def run_tests(*args,**kwargs):
-    import unittest
-    # test_locking()
-    test_modules = ["objects", "interfaces", "gui", "parsing"]
-    # test_modules = ["gui"]
-    # test_modules = ["interfaces"]
-    # test_modules = ["objects"]
-    # test_modules = ["gui","interfaces"]
-    suites = []
-    loader = unittest.TestLoader()
-    for mod_name in test_modules:
-        mod = __import__(mod_name)
-        suites.append(loader.loadTestsFromModule(mod))
-    suite = unittest.TestSuite(suites)
-    # testResult = unittest.TextTestRunner(verbosity=2).run(suite)
-    testResult = unittest.TextTestRunner().run(suite)
-
 def computer_game(*args,**kwargs):
     """
     Start a game of Snake for a computer to play.
     """
-    return 
-
-def human_game(*args,**kwargs):
-    """
-    Start a game of Snake for a human to play.
-    """
     data = {
-        "height": 320,
-        "width": 320,
+        "height": 160,
+        "width": 160,
         "size": 10,
         "snake_speed": 10,
-        "auto_tick": True,
-        "frames": 60,
+        "auto_tick": False,
+        "frames": 10,
         "testing": False,
     }
     game = SnakeGame(**data)
@@ -129,27 +92,157 @@ def human_game(*args,**kwargs):
     debug("Finished starting")
     return 
 
+def human_game(*args,**kwargs):
+    """
+    Start a game of Snake for a human to play.
+    """
+    data = {
+        "height": 320,
+        "width": 320,
+        "size": 10,
+        "snake_speed": 8,
+        "auto_tick": True,
+        "frames": 60,
+        "testing": False,
+    }
+    # data = {
+    #     "height": 320,
+    #     "width": 320,
+    #     "size": 10,
+    #     "snake_speed": 10,
+    #     "auto_tick": False,
+    #     "frames": 8,
+    #     "testing": False,
+    # }
+    # data = {
+    #     "height": 320,
+    #     "width": 320,
+    #     "size": 10,
+    #     "snake_speed": 8,
+    #     "auto_tick": False,
+    #     "frames": 8,
+    #     "testing": False,
+    # }
+    game = SnakeGame(**data)
+    data = {
+        "screenshot_path": None,
+    }
+    board = Gameboard(game, **data)
+    board.start()
+    debug("Finished starting")
+    return 
+
+# def main(*args):
+#     """
+#     Start a game of Snake for a human or AI to start playing.
+#     """
+#     sg = startup.SnakeGameArgumentParser()
+#     if args:
+#         app = sg.parse_args(args=args)
+#     else:
+#         app = sg.parse_args()
+#     if app is None:
+#         return 
+#     # human_game()
+#     computer_game()
+#     # run_tests()
+
+
+
+def start_play(app):
+    gui_data = {
+        "screenshot_path": None,
+    }
+    # game_data = {
+    #     "player_name": app.player_name,
+    #     "height": app.height,
+    #     "width": app.width,
+    #     "size": app.size,
+    #     "snake_speed": app.snake_speed,
+    #     "auto_tick": app.auto_tick,
+    #     "frames": app.frames,
+    #     "testing": app.testing,
+    # }
+    if app.mode == "human":
+        game_data = {
+            "player_name": "JAD",
+            "height": 320,
+            "width": 320,
+            "size": 10,
+            "snake_speed": 10,
+            "auto_tick": True,
+            "frames": 60,
+            "testing": False,
+        }
+        # game_data = {
+        #     "height": 320,
+        #     "width": 320,
+        #     "size": 10,
+        #     "snake_speed": 10,
+        #     "auto_tick": False,
+        #     "frames": 8,
+        #     "testing": False,
+        # }
+        # game_data = {
+        #     "height": 320,
+        #     "width": 320,
+        #     "size": 10,
+        #     "snake_speed": 8,
+        #     "auto_tick": False,
+        #     "frames": 8,
+        #     "testing": False,
+        # }
+    elif app.mode == "computer":
+        game_data = {
+            "player_name": "Derik Q Newton",
+            "height": 160,
+            "width": 160,
+            "size": 10,
+            "snake_speed": 10,
+            "auto_tick": False,
+            "frames": 10,
+            "testing": False,
+        }
+    else:
+        return
+    game = SnakeGame(**game_data)
+    board = Gameboard(game, **gui_data)
+    board.start()
+
 def main(*args):
     """
     Start a game of Snake for a human or AI to start playing.
     """
-    sg = startup.SnakeGameArgumentParser()
+    parser = mainParser.MainArgumentParser()
+    if args and len(args) ==1:
+        args = shlex.split(args[0])
     if args:
-        app = sg.parse_args(args=args)
+        app, args = parser.parse_known_args(args=args)
     else:
-        app = sg.parse_args()
-    if app is None:
+        app, args = parser.parse_known_args()
+    if not app:
         return 
-    human_game()
-    # run_tests()
+    debug(app)
+    if not hasattr(app, "action") or app.action == "play":
+        start_play(app)
+    elif app.action == "test":
+        results = app._test_parser.run_tests(app)
+        info(results)
+    else:
+        return
 
 
 if __name__ == '__main__':
-    main("human")
+    # main("screenshot")
+    main("play human -pn 'JAD'")
+    # main("test --verbose -tcs objects.TestObstacleObject -tmt objects.TestSnakeObject.test_self_intersection")
+    # main("test --verbose -tcs interfaces.TestScribe")
 
 
 # *** TODO LIST ***
-# fix the frequency at which fruit spawn
+# change game to maintain sql connection until its game over
+# change GET_UUID
+
 # Setup game board to be able to render and play slices of a recorded game state
 # Setup game to be able to log state to a database
 # create a method(s) so that a series of states can be given, and the game will save the screenshots
@@ -160,13 +253,12 @@ if __name__ == '__main__':
 #     who plays
 # Clean up unused pieces of code ( specifically so that the main game is single threaded )
 # Clean up logging and error catching
-# determine what will set the score, and how it is tracked overtime
 # set exe icon
 # create win condition and winning screen
 # set restart to start the game again from the beginning instead of resuming the current game
 # create easy, meduim, hard default settings
 # setup game to convert images into video (timestamped) on game over
-
+# fix screenshots to be saved as a single gif while playing
 
 # *** RESEARCH TOPICS ***
 # # hamiltonian loops

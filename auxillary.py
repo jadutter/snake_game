@@ -209,8 +209,6 @@ def stringify(v):
     """
     if isinstance(v,str):
         pass
-    elif isinstance(v,unicode):
-        v = str(v)
     elif isinstance(v,list):
         v = str(v)
     elif isinstance(v,tuple):
@@ -419,7 +417,7 @@ class StackContextFilter(logging.Filter):
                     record.locals={}
                     record.stack = "No tb"
                     # aux_warn("StackContextFilter failed to get traceback.{}".format(err), extra={"err" : err, "tb" : sys.exc_info()[2]})
-                    aux_crit("StackContextFilter failed to get traceback.", extra={"err" : err, "tb" : sys.exc_info()[2]})
+                    # logging.critical("StackContextFilter failed to get traceback.", extra={"err" : err, "tb" : sys.exc_info()[2]})
             else:
                 # print(json.dumps(vars(record), indent=4, separators=(",",": "), sort_keys=True, cls=CustomEncoder))
                 record.stack = "You forgot to export tb when an exception occurs."
@@ -498,13 +496,13 @@ def get_path(path):
     # print("{}".format(path))
     return path
 
-def dir_path(d):
+def dir_path(d, suppress=False):
     """
     Convert a string into a full path to a folder, 
     ensuring the folder exists.
     """
     d = get_path(d)
-    if not os.path.isdir(d):
+    if not os.path.isdir(d) and suppress == False:
         raise ValueError("{} does not appear to be a proper path to a folder.".format(d))
     return d
 
@@ -1278,31 +1276,28 @@ def test_sql_handler(channel,logr):
         channel(result)
 
 try:
-    # open the yaml file
-    with open(os.path.join(
-            os.path.dirname(__file__),
-            "logging_config.yml"), "r") as f:
-        cfg = yaml_safe_load(f)
-        # and parse the yaml data into a python dict
-    log_folder = cfg.pop("log_folder")
-    # get the directory where we want the log files to reside
-    if not os.path.isdir(log_folder):
-        # if the directory does not exist
-        os.mkdir(log_folder)
-        # make the directory
-    for name,hdlr in cfg.get("handlers").items():
-        # for each handler in the config
-        if "filename" in hdlr:
-            # if the handler has a filename attribute
-            cfg["handlers"][name]["filename"] = os.path.join(log_folder, hdlr.get("filename"))
-            # set the file to reside in the log directory we want to use
-    logging.config.dictConfig(cfg)
-    # use the dict to configure the most of the logging setup
+    # # open the yaml file
+    # with open(os.path.join(
+    #         os.path.dirname(__file__),
+    #         "logging_config.yml"), "r") as f:
+    #     cfg = yaml_safe_load(f)
+    #     # and parse the yaml data into a python dict
+    # log_folder = cfg.pop("log_folder")
+    # # get the directory where we want the log files to reside
+    # if not os.path.isdir(log_folder):
+    #     # if the directory does not exist
+    #     os.mkdir(log_folder)
+    #     # make the directory
+    # for name,hdlr in cfg.get("handlers").items():
+    #     # for each handler in the config
+    #     if "filename" in hdlr:
+    #         # if the handler has a filename attribute
+    #         cfg["handlers"][name]["filename"] = os.path.join(log_folder, hdlr.get("filename"))
+    #         # set the file to reside in the log directory we want to use
+    # logging.config.dictConfig(cfg)
+    # # use the dict to configure the most of the logging setup
     aux_logr = logging.getLogger("Aux")
-    # get a logger for our main
-    aux_logr.addFilter(StackContextFilter())
-    aux_logr.addFilter(TraceContextFilter(base_fnc="__wrap_log_fnc"))
-    # register our context filters to the logger
+    # get a logger 
     aux_log = aux_logr.log
     aux_crit = aux_logr.critical
     aux_error = aux_logr.error
@@ -1313,18 +1308,14 @@ try:
     # convert them into simple one word functions
     assert aux_debug == getattr(aux_logr,"debug"), "Something went wrong with getting logging functions..."
     # the logger method called "debug", should now be the same as our function aux_debug()
-except YAMLError as err:
-    logging.log(logging.CRITICAL,"Failed to read yaml file.")
-    logging.exception(err)
-    # print the message to the root logger
-    raise err
+# except YAMLError as err:
+#     logging.log(logging.CRITICAL,"Failed to read yaml file.")
+#     logging.exception(err)
+#     # print the message to the root logger
+#     raise err
 except Exception as err:
     logging.log(logging.CRITICAL,"Failed to configure logging.")
     logging.exception(err)
     # print the message to the root logger
     raise err
 
-# if __name__ == '__main__':
-#     # test_sql_handler(aux_debug,aux_logr)
-#     # aux_logr.info("Testing sql_handler".format(),extra={"type":"System"})
-#     aux_info("Testing sql_handler".format(),extra={"type":"System"})

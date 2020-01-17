@@ -23,6 +23,7 @@ class Obstacle(object):
             # o = Obstacle(1,2,3,4)
             self.dimensions = dimensions
             # otherwise, assume we've gotten the 4 arguments
+        self.id = None
     def render(self):
         """
         Return a rectangle to display in a Surface.

@@ -3,26 +3,17 @@ import multiprocessing
 import json
 from .player import Player
 from .game import *
-from .DQN import DQN
+# from .DQN import DQN
 from objects.snake import Snake
 from objects.segment import Segment
 from objects.obstacle import Obstacle
 from objects.fruit import Fruit
-
-# import pprint
-# _pp = pprint.PrettyPrinter(
-#                         indent=4,
-#                         depth=7,
-#                         width=100,
-#                     )
-# pp = _pp.pprint
-# print(pp.pformat(game.game_state))
-
+from .scribe import Scribe
 import logging
 
 try:
     if "logr" not in globals():
-        logr = logging.getLogger("MainApp")
+        logr = logging.getLogger("Iface")
         # get a logger
         log = logr.log
         crit = logr.critical
@@ -42,112 +33,10 @@ except Exception as err:
 finally:
     pass
 
-# class TestSnakeGameInitObject(unittest.TestCase):
-#     """
-#     Test that the SnakeGame object behaves as expected.
-#     """
-#     @unittest.skip("skipping test_init")
-#     def test_init(self):
-#         """
-#         Test if we can create a SnakeGame object.
-#         """
-#         data = {
-#             "testing": True,
-#             "height": 640,
-#             "width": 640,
-#             "frames": 30,
-#             "score": 10,
-#             "snake_speed": 5,
-#             "size": 10,
-#             "starting_length": 2,
-#             "auto_tick": False,
-#             "fruits":{
-#                 "apple": lambda dimensions: Fruit("apple", dimensions, 1, color=(200,0,0), frequency=0.05 ),
-#                 # 1 in 20 chance of an apple appearing each second, worth 1 point
-#                 "orange": lambda dimensions: Fruit("orange", dimensions, 10, color=(128,128,0), frequency=0.01 ),
-#                 # 1 in 100 chance of an orange appearing each second, worth 10 points
-#                 "bananna": lambda dimensions: Fruit("bananna", dimensions, 20, color=(255,255,0), frequency=0.005 ),
-#                 # 1 in 200 chance of an bananna appearing each second, worth 20 points
-#             }
-#         }
-#         game = SnakeGame(**data)
-#         self.assertFalse(game.auto_tick)
-#         self.assertEqual(game.height, data.get("height"))
-#         self.assertEqual(game.width, data.get("width"))
-#         self.assertEqual(game.frames, data.get("frames"))
-#         self.assertEqual(game.score, data.get("score"))
-#         self.assertEqual(game.snake_speed, data.get("snake_speed"))
-#         self.assertEqual(game.size, data.get("size"))
-#         self.assertEqual(game.starting_length, data.get("starting_length"))
-#         self.assertEqual(game.crashed, False)
-#         self.assertEqual(game.playing, False)
-#         self.assertEqual(game.next_fruit, None)
-#         # self.assertEqual(game.obstacles, [])
-#         self.assertEqual(len(game.obstacles), 4)
-#         self.assertEqual(game.rewards, [])
-#         apple = game.fruits.get("apple")([ 45, 67, game.size])
-#         self.assertIsInstance(apple, Fruit)
-#         self.assertEqual(apple.frequency, 0.05)
-#         self.assertEqual(apple.color, (200,0,0))
-#         self.assertEqual(apple.x, 45)
-#         self.assertEqual(apple.y, 67)
-#         self.assertEqual(apple.value, 1)
-#         self.assertEqual(apple.size, game.size)
-#         game.rewards += [ apple ]
 
-#         self.assertEqual(game.next_cmd, None)
-
-#         # self.assertEqual(game.game_state, None)
-
-#         self.assertNotEqual(game.game_state, None)
-#         self.assertEqual(len(game.game_state), 4)
-#         game_state, obstacles, rewards, (snake_segs, snake_belly) = game.game_state
-
-#         self.assertEqual(game.playing, game_state[0])
-#         self.assertEqual(game.crashed, game_state[1])
-#         self.assertEqual(game.score, game_state[2])
-#         self.assertEqual(game.size, game_state[3])
-#         self.assertEqual(game.height, game_state[4])
-#         self.assertEqual(game.width, game_state[5])
-#         self.assertEqual(game.snake_speed, game_state[6])
-#         self.assertEqual(game.auto_tick, game_state[7])
-
-#         self.assertEqual(len(game.obstacles), len(obstacles))
-#         self.assertEqual([ob.dimensions for ob in game.obstacles], obstacles)
-
-#         self.assertEqual(len(game.rewards), len(rewards))
-#         self.assertEqual([[rw.dimensions, rw.value] for rw in game.rewards], rewards)
-
-#         self.assertEqual(game.snake.belly, snake_belly)
-#         self.assertEqual([[sg.dimensions, sg.heading] for sg in game.snake.segments], snake_segs)
-#         self.assertEqual(game.next_cmd, None)
-#         # game._spawn_next_cmd_tester()
-#         # game._spawn_game_state_tester()
-#         # spawn_next_cmd_tester(game,0)
-
-#         # game.next_cmd = 0
-#         # self.assertEqual(str(game.next_cmd), "0")
-
-#         # debug(vars(game))
-#         # debug(dir(game))
-#         # debug(game.__dict__)
-#         # debug(game.__getattribute__("next_cmd"))
-
-#         # _SnakeGame__next_cmd
-#         # debug(f"input {game._SnakeGame__input.poll()}")
-#         # debug(f"output {game._SnakeGame__output.poll()}")
-#         # pp("TESTING")
-#         # pp(game.next_cmd)
-#         # game.next_cmd = 0
-#         # pp(game.next_cmd)
-#         # # self.assertEqual(str(game.next_cmd), "0")
 
 def test_setting_next_cmd(self,value):
     self.next_cmd = value
-
-def test_getting_game_state(self):
-    game_state, obstacles, rewards, (snake_segs, snake_belly) = self.game_state
-    # assert
 
 data = {
     "testing": True,
@@ -395,5 +284,32 @@ class TestSnakeGameCmdProcesses(unittest.TestCase):
         self.assertTrue(SnakeGame.compare_states(run_state, global_game.game_state))
         self.assertListEqual(run_state, global_game.game_state)
 
+class TestScribe(unittest.TestCase):
+    """
+    Test that the SnakeGame object behaves as 
+    expected when acted upon by multiple processes.
+    """
+    def setUp(self):
+        debug("TestScribe.setUp")
+        self.scribe = Scribe("data.db")
+
+    def test_get_commands(self):
+        """
+        Test if we can use the Scribe object to get available commands from the database
+        """
+        result = self.scribe.db.tables
+        info(result)
+        result = self.scribe.db.get_columns("games")
+        info(result)
+        # result = self.scribe.get("commands",None)
+        # info(result)
+        # result = self.scribe.get("commands","name LIKE '%Move the snake%'")
+        # info(result)
+        # result = self.scribe.exc("SELECT key FROM commands WHERE name LIKE '%Move the snake%'",row_factory="tuple")
+        # info(result)
+        # self.scribe.exc("INSERT INTO 'commands_executed' ('command', 'game') VALUES (0,0)")
+        result = self.scribe.exc("SELECT * FROM commands_executed")
+        info(result)
+        
 if __name__ == '__main__':
     unittest.main()
